@@ -151,11 +151,20 @@ def train(resume_from=None):
 
             total_loss += loss.item()
             count += 1
+            
+        avg_train_loss = total_loss / len(train_loader)
+        logger.info(f"Epoch {epoch + 1}/{args.max_steps}, Train Loss: {avg_train_loss}")
 
-        logger.info(f"Epoch {epoch + 1}/{args.max_steps}, Loss: {total_loss / len(train_loader)}")
-
-        if (epoch + 1) % args.log_step_count_steps == 0:
-            validate(ae, val_loader, device, criterion)
+        if (epoch + 1) % args.val_interval == 0:
+            val_loss = validate(ae, val_loader, device, criterion)
+            
+            # Save to log file in dedicated 'log' folder
+            log_dir = './log'
+            log_path = os.path.join(log_dir, 'train_log.txt')
+            os.makedirs(log_dir, exist_ok=True)
+            with open(log_path, 'a') as f:
+                f.write(f"Epoch {epoch + 1}, Train Loss: {avg_train_loss:.6f}, Val Loss: {val_loss:.6f}\n")
+            logger.info(f"Log updated at {log_path}")
 
         if (epoch + 1) % args.save_checkpoints_steps == 0:
             save_path = os.path.join(args.checkpoint_dir, f'model_epoch_{epoch + 1}.pth')
@@ -178,7 +187,9 @@ def validate(model, val_loader, device, criterion):
 
             total_loss += loss.item()
 
-    logger.info(f"Validation Loss: {total_loss / len(val_loader)}")
+    avg_val_loss = total_loss / len(val_loader)
+    logger.info(f"Validation Loss: {avg_val_loss}")
+    return avg_val_loss
 ################################################################################
 # Script
 ################################################################################
@@ -230,10 +241,10 @@ if __name__ == '__main__':
         '--keep_checkpoint_max', type=int, default=1,
         help='Maximum number of checkpoint files to keep.')
 
-    # 每10个epoch进行一次验证 
+    # 每多少个epoch进行一次验证 
     parser.add_argument(
-        '--log_step_count_steps', type=int, default=10,
-        help='Log global step and loss every n steps.')
+        '--val_interval', type=int, default=10,
+        help='Epoch interval between validation and logging.')
 
     # 没用到
     parser.add_argument(
@@ -302,7 +313,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--adda_alpha', type=float, default=1.0,
         help='ADDA non-linearity parameter alpha.')
-        
+
     parser.add_argument(
         '--adda_beta', type=float, default=1.0,
         help='ADDA non-linearity parameter beta.')

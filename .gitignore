@@ -6,3 +6,7 @@ data/*
 # 同理忽略 model
 model/*
 !model/.gitkeep
+
+# 忽略日志文件夹
+log/*
+!log/.gitkeep
