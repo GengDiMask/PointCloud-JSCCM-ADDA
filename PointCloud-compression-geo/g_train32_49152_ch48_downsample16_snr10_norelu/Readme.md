@@ -1,0 +1,140 @@
+# 点云轻量化联合编码调制系统 (JCMPC)
+
+本项目实现了基于论文 **"Lightweight Joint Coding-Modulation Optical Fiber Communication System for Point Cloud"** 的点云联合信源信道编码（JSCC）方案。
+
+## 1. 项目简介 (Project Overview)
+
+本项目提出了一种基于3D卷积神经网络的点云传输系统（JCMPC），旨在通过联合编码调制技术实现高效的点云光纤通信传输。
+- **核心特性**: 采用双分支对称卷积神经网络结构，直接将点云体素块映射为模拟符号。
+- **优势**: 相比传统分离式编码方案，本方案能有效避免“悬崖效应”，在信道条件恶化时展现出更平滑的性能下降，同时大幅降低解码端的计算复杂度（降低约80%）。
+- **数据集**: 训练和验证使用大小为 $32 \times 32 \times 32$ 的体素化点云块，数据集总量为 49,152 个块。
+
+## 2. 文件结构与功能 (File Structure)
+
+主要代码文件功能如下：
+
+| 文件名 | 功能描述 |
+|--------|----------|
+| `TAE.py` | **网络模型定义**。包含 Encoder（编码器）、Decoder（解码器）、AWGNChannel（加性高斯白噪声信道）以及用于处理样本不平衡的 Focal Loss 定义。网络采用了双分支对称卷积结构。 |
+| `train_resume.py` | **网络训练脚本**。专门用于训练模型（支持从头训练或加载 checkpoint 继续训练）。默认配置：48个通道 (ch48)，SNR=10dB。 |
+| `compress.py` | **编码（压缩）脚本**。加载训练好的模型，将输入的 .ply 点云块压缩为特征向量，并输出为 .txt 文件。 |
+| `decompress.py` | **解压与实验验证脚本**。用于对压缩数据进行重建。支持常规 AWGN 信道仿真或 ADDA 补偿实验模式。 |
+| `partition.py` | **分块工具**。将大场景或完整物体的点云分割为 $32 \times 32 \times 32$ 的标准小块，以便网络输入。 |
+| `merge.py` | **合并工具**。将解压重建后的多个点云小块合并回一个完整的点云文件。 |
+| `pc_io.py` | **IO 工具库**。包含点云文件的读取、写入、格式转换及辅助处理函数。 |
+| `FLOPs.py` | **复杂度测试**。用于计算网络模型的计算量（FLOPs），评估轻量化程度。 |
+
+## 3. 使用说明 (Usage Guide)
+
+### 3.1 训练 (Training)
+使用 `train_resume.py` 可以方便地恢复训练。
+```bash
+python train_resume.py --num_filters 48 --batch_size 64 --task geometry --checkpoint_dir ./model/block_32_...
+```
+- **参数说明**:
+    - `--num_filters`: 卷积层滤波器数量，本项目中配置为 48。
+    - `--lmbda_g`: 几何失真权重（Lambda），用于平衡码率和失真。
+    - `--alpha`, `--gamma`: Focal Loss 的超参数，用于解决体素稀疏性问题。
+
+### 3.2 压缩 (Compression)
+使用 `compress.py` 对分块后的点云进行推理编码。
+```bash
+python compress.py --input_dir <输入ply文件夹> --output_dir <输出txt文件夹> --checkpoint_dir <模型路径>
+```
+
+### 3.3 解压与实验验证 (Decompression)
+使用 `decompress.py` 对压缩数据进行重建。
+- **输入**: 经过信道传输后的数据（或压缩脚本生成的 txt 文件）。
+- **输出**: 重建后的 ply 点云文件。
+- **注意**: 若进行 ADDA 实验，请开启 `--enable_adda` 参数。
+
+```bash
+python decompress.py --input_dir <压缩数据路径> --output_dir <重建输出路径> --enable_adda ...
+```
+
+### 3.4 辅助工具
+1. **分块**: 先运行 `partition.py` 将原始点云切分为 $32 \times 32 \times 32$ 的块。
+2. **合并**: 解压完成后，运行 `merge.py` 将块合并为完整点云以计算最终指标（D1-PSNR, D2-PSNR）。
+
+## 4. 注意事项
+- 本目录代码配置为 `g_train32_49152_ch48_downsample16_snr10_norelu`，即：
+    - 训练块大小: 32
+    - 数据量: 49152
+    - 通道数: 48
+    - 下采样倍率: 16 (基于网络结构推断)
+    - 目标 SNR: 10dB
+    - 激活函数: No ReLU (部分层或特定配置)
+- 确保输入数据的维度与训练配置一致。
+
+## 5. 链路损伤补偿研究方案 (训练方案设计)
+
+针对开题报告中 **"基于一体化联合编码调制技术的链路损伤补偿研究"**，特别是为了弥补 ADDA（模数/数模转换器）的非线性效应和量化噪声，本部分提出一套针对性的训练方案。本方案仅针对点云**几何信息**进行训练。
+
+### 5.1 总体思路
+
+在 JSCCM 端到端训练框架中，将 ADDA 的物理损伤建模为可微的数学层（Differentiable Layer），嵌入到编码器（Tx）和解码器（Rx）之间。网络将在训练过程中自动学习：
+1.  **编码器 (Tx)**: 学习 **预失真 (Pre-distortion)** 策略，主动抵消即将发生的非线性。
+2.  **解码器 (Rx)**: 学习 **非线性均衡 (Post-equalization)**，从失真信号中恢复特征。
+
+### 5.2 核心模型建模 (Channel Modeling)
+
+需要在 `TAE.py` 中扩展 `AWGNChannel` 或新增 `ADDAChannel` 类。
+
+#### A. ADDA 非线性模型 (Non-linearity)
+ADDA 的传输特性曲线通常呈现 S 型饱和或非线性。可用以下模型模拟：
+-   **模型公式**: $y = \alpha \cdot \tanh(\beta \cdot x)$ 或多项式模型 $y = x + a_3 x^3 + a_5 x^5$。
+-   在 `TAE.py` 中实现一个 `NonLinearLayer`，参数 $\alpha, \beta$ 或 $a_n$ 可设为可学习参数或根据器件手册固定。
+
+#### B. 量化噪声 (Quantization)
+DAC/ADC 的有限分辨率（如 8-bit, 10-bit）引入量化误差。
+-   **前向传播**: $y = \text{round}(x \cdot 2^{B-1}) / 2^{B-1}$
+-   **反向传播**: 由于 `round` 函数不可导，需使用 **直通估计器 (Straight-Through Estimator, STE)**，即认为 $\frac{\partial y}{\partial x} = 1$。
+
+### 5.3 详细执行步骤 (Execution Steps)
+
+#### 步骤一：基准模型训练 (Baseline Training)
+首先在纯 AWGN 信道下训练模型，获得一个良好的预训练权重。
+```bash
+# 训练基准模型 (无 ADDA, SNR=10dB)
+python train_resume.py --num_filters 48 --task geometry --checkpoint_dir ./model/baseline_snr10
+```
+
+#### 步骤二：ADDA 适应性训练 (Adaptation Training)
+加载步骤一的权重，开启 ADDA 补偿模式进行微调。
+```bash
+# 加载预训练模型，开启 ADDA (8-bit 量化, alpha=1.0, beta=1.0)
+python train_resume.py \
+    --enable_adda \
+    --adda_bits 8 \
+    --adda_alpha 1.0 \
+    --adda_beta 1.0 \
+    --checkpoint_dir ./model/adda_adaptation \
+    --resume_from ./model/baseline_snr10/model_epoch_XXX.pth
+```
+*注意：需在 `train_resume.py` 中手动指定 `resume_from` 路径或修改代码中的默认路径。*
+
+#### 步骤三：模型测试与压缩 (Testing/Compression)
+使用训练好的 ADDA 补偿模型进行点云压缩。
+```bash
+python compress.py \
+    --enable_adda \
+    --adda_bits 8 \
+    --adda_alpha 1.0 \
+    --adda_beta 1.0 \
+    --checkpoint_dir ./model/adda_adaptation \
+    --input_dir ./data/test/blocks \
+    --output_dir ./output/compressed_adda
+```
+
+#### 步骤四：模型解压与验证 (Decompression)
+解压数据并计算性能指标。注意解压时也需要开启 `enable_adda` 以应用正确的信道模型（如果是在仿真模式下）。
+```bash
+python decompress.py \
+    --enable_adda \
+    --adda_bits 8 \
+    --adda_alpha 1.0 \
+    --adda_beta 1.0 \
+    --checkpoint_dir ./model/adda_adaptation \
+    --input_dir ./output/compressed_adda \
+    --output_dir ./output/decompressed_adda
+```
