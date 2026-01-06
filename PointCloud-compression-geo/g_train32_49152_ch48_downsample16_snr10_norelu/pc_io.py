@@ -136,7 +136,7 @@ def load_points(files, p_min, p_max, task, batch_size=2):# 原是32 # compress�
     with multiprocessing.Pool() as p:
         logger.info('Loading PCs into memory (parallel reading)')
         f = functools.partial(load_points_func, p_min=p_min, p_max=p_max, task=task)
-        points = np.array(list(tqdm(p.imap(f, files, batch_size), total=files_len)))
+        points = np.array(list(tqdm(p.imap(f, files, batch_size), total=files_len)), dtype=object)
         # print("数组元素总数：", points.size)  # 打印数组尺寸，即数组元素总数
         # print("数组形状：", points.shape)  # 打印数组形状
         # print("数组的维度数目", points.ndim)  # 打印数组的维度数目

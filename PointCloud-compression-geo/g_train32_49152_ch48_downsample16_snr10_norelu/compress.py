@@ -31,6 +31,7 @@ parser.add_argument(
 parser.add_argument(
     '--checkpoint_dir',
     help='Directory where to save/load model checkpoints.',type=str,default='./model/block_32_norgb_ch48_downsample16_snr10_g2500_c0_resnettranspose49152_norelu_torchtest_alpha090')
+# 没用到
 parser.add_argument(
     '--batch_size', type=int, default=1,
     help='Batch size.')
@@ -46,9 +47,7 @@ parser.add_argument(
 parser.add_argument(
     '--num_filters', type=int, default=48,
     help='Number of filters per layer.')
-parser.add_argument(
-    '--preprocess_threads', type=int, default=16,
-        help='Number of CPU threads to use for parallel decoding.')
+
 parser.add_argument(
         '--color_space', type=str, default='rgb',
         help='Color space type.')
@@ -58,12 +57,7 @@ parser.add_argument(
 parser.add_argument(
         '--channels_last', action='store_true',
         help='Use channels last instead of channels first.')
-# 原始:
-parser.add_argument('--model_save_folder', help='Directory where to save/load trained models.')
-parser.add_argument('--glob_input_path', help='Point clouds glob pattern to be compressed.')
-parser.add_argument('--compressed_path', help='Compressed file saving directory.')
-parser.add_argument('--load_scale', type=int, help='Input point cloud coordinate scale. [0, load_scale]', default=1)
-parser.add_argument('--ALPHA', type=int, help='The factor of patch coverage ratio.', default=2)
+
 # ADDA Compensation Arguments
 parser.add_argument(
     '--enable_adda', action='store_true',

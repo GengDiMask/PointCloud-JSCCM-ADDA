@@ -50,9 +50,6 @@ parser.add_argument(
     '--num_filters', type=int, default=48,
     help='Number of filters per layer.')
 parser.add_argument(
-    '--preprocess_threads', type=int, default=16,
-        help='Number of CPU threads to use for parallel decoding.')
-parser.add_argument(
         '--color_space', type=str, default='rgb',
         help='Color space type.')
 parser.add_argument(

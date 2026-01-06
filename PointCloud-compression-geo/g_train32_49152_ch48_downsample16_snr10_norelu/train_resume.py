@@ -110,14 +110,14 @@ def train(resume_from=None):
         points_train, 
         batch_size=args.batch_size, 
         shuffle=True, 
-        num_workers=1, 
+        num_workers=0,  # Windows doesn't support multiprocessing with lambda
         collate_fn=lambda batch: pad_collate_fn(batch, task=args.task)
     )
     val_loader = data.DataLoader(
         points_val, 
         batch_size=args.batch_size, 
         shuffle=False, 
-        num_workers=1, 
+        num_workers=0,  # Windows doesn't support multiprocessing with lambda
         collate_fn=lambda batch: pad_collate_fn(batch, task=args.task)
     )
 
@@ -193,47 +193,52 @@ if __name__ == '__main__':
     parser.add_argument(
         '--train_glob',
         help='Glob pattern for identifying training data.',type=str,default='./data/train/blocks_32_rgb_49152/*.ply')
+
     parser.add_argument(
         '--checkpoint_dir',
-        help='Directory where to save/load model checkpoints.',type=str,default='./model/debug')
+        help='Directory where to save/load model checkpoints.',type=str,default='./model/baseline_snr10')
 
     parser.add_argument(#blocksize
         '--resolution',
         type=int, help='Dataset resolution.', default=32)
+
     parser.add_argument(
         '--num_data', type=int, default=None,
         help='Number of total data we want to use (-1: use all data).')
+
     parser.add_argument(
         '--num_val', type=int, default=4864,#64
         help='Number of validation data we want to use')
 
+    # 没用到
     parser.add_argument(
         '--verbose', '-v', action='store_true',
         help='Report bitrate and distortion when training.')
 
+    # 没用到
     parser.add_argument(
         '--no_additional_metrics', action='store_true',
         help='Report additional metrics when training.')
-
+    
+    # model每10个epoch保存一次
     parser.add_argument(
         '--save_checkpoints_steps', type=int, default=10,
         help='Save checkpoints every n steps during training.')
 
+    # 没用到
     parser.add_argument(
         '--keep_checkpoint_max', type=int, default=1,
         help='Maximum number of checkpoint files to keep.')
 
+    # 每10个epoch进行一次验证 
     parser.add_argument(
         '--log_step_count_steps', type=int, default=10,
         help='Log global step and loss every n steps.')
 
+    # 没用到
     parser.add_argument(
         '--save_summary_steps', type=int, default=100,
         help='Save summaries every n steps.')
-
-    parser.add_argument(
-        '--debug_address', default=None,
-        help='TensorBoard debug address.')
 
     parser.add_argument(
         '--task', type=str, default='geometry',
@@ -247,9 +252,6 @@ if __name__ == '__main__':
         '--batch_size', type=int, default=64,#16
         help='Batch size for training.')
 
-    parser.add_argument(
-        '--prefetch_size', type=int, default=128,#128
-        help='Number of batches to prefetch for training.')
 
     parser.add_argument(
         '--lmbda_g', type=float, default=2500,
@@ -267,13 +269,10 @@ if __name__ == '__main__':
         '--gamma', type=float, default=2.0,
         help='Focal loss gamma.')
 
+    # 训练的epoch数
     parser.add_argument(
         '--max_steps', type=int, default=1000,
         help='Train up to this number of steps.')
-
-    parser.add_argument(
-        '--preprocess_threads', type=int, default=16,
-        help='Number of CPU threads to use for parallel decoding.')
 
     parser.add_argument(
         '--loss_type', type=str, default='l2',
@@ -282,10 +281,11 @@ if __name__ == '__main__':
     parser.add_argument(
         '--ssim_filter', type=int, default=6,
         help='Filter size for ssim loss.')
-        
+
     parser.add_argument(
         '--loss_weight', type=str, default='f,1,1,1',
         help='Loss weights for different channels.')
+
     parser.add_argument(
         '--channels_last', action='store_true',
         help='Use channels last instead of channels first.')
@@ -294,12 +294,15 @@ if __name__ == '__main__':
     parser.add_argument(
         '--enable_adda', action='store_true',
         help='Enable ADDA channel compensation training.')
+
     parser.add_argument(
         '--adda_bits', type=int, default=8,
         help='Quantization bits for ADDA.')
+
     parser.add_argument(
         '--adda_alpha', type=float, default=1.0,
         help='ADDA non-linearity parameter alpha.')
+        
     parser.add_argument(
         '--adda_beta', type=float, default=1.0,
         help='ADDA non-linearity parameter beta.')

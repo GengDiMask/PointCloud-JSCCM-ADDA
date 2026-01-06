@@ -100,6 +100,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--batch_size', type=int, default=1,
         help='Batch size.')
+    # 没用到
     parser.add_argument(
         '--read_batch_size', type=int, default=1,
         help='Batch size for parallel reading.')
@@ -112,9 +113,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--num_filters', type=int, default=48,
         help='Number of filters per layer.')
-    parser.add_argument(
-        '--preprocess_threads', type=int, default=16,
-        help='Number of CPU threads to use for parallel decoding.')
+
     parser.add_argument(
         '--output_extension', default='.ply',
         help='Output extension.')
