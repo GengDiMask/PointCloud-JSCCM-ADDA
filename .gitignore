@@ -1,0 +1,8 @@
+# 忽略 data 文件夹下的所有内容...
+data/*
+# ...但是除了 .gitkeep 文件
+!data/.gitkeep
+
+# 同理忽略 model
+model/*
+!model/.gitkeep
