@@ -210,21 +210,27 @@ if __name__ == '__main__':
     parser.add_argument(
         '--verbose', '-v', action='store_true',
         help='Report bitrate and distortion when training.')
+
     parser.add_argument(
         '--no_additional_metrics', action='store_true',
         help='Report additional metrics when training.')
+
     parser.add_argument(
         '--save_checkpoints_steps', type=int, default=10,
         help='Save checkpoints every n steps during training.')
+
     parser.add_argument(
         '--keep_checkpoint_max', type=int, default=1,
         help='Maximum number of checkpoint files to keep.')
+
     parser.add_argument(
         '--log_step_count_steps', type=int, default=10,
         help='Log global step and loss every n steps.')
+
     parser.add_argument(
         '--save_summary_steps', type=int, default=100,
         help='Save summaries every n steps.')
+
     parser.add_argument(
         '--debug_address', default=None,
         help='TensorBoard debug address.')
@@ -232,39 +238,51 @@ if __name__ == '__main__':
     parser.add_argument(
         '--task', type=str, default='geometry',
         help='Compression tasks (geometry/color/geometry+color).')
+
     parser.add_argument(
         '--num_filters', type=int, default=48,#32 控制压缩率
         help='Number of filters per layer.')
+
     parser.add_argument(
         '--batch_size', type=int, default=64,#16
         help='Batch size for training.')
+
     parser.add_argument(
         '--prefetch_size', type=int, default=128,#128
         help='Number of batches to prefetch for training.')
+
     parser.add_argument(
         '--lmbda_g', type=float, default=2500,
         help='Lambda (geometry) for rate-distortion tradeoff.')
+
     parser.add_argument(
         '--lmbda_c', type=float, default=0,
         help='Lambda (color) for rate-distortion tradeoff.')
+
     parser.add_argument(
         '--alpha', type=float, default=0.9,
         help='Focal loss alpha.')
+
     parser.add_argument(
         '--gamma', type=float, default=2.0,
         help='Focal loss gamma.')
+
     parser.add_argument(
         '--max_steps', type=int, default=1000,
         help='Train up to this number of steps.')
+
     parser.add_argument(
         '--preprocess_threads', type=int, default=16,
         help='Number of CPU threads to use for parallel decoding.')
+
     parser.add_argument(
         '--loss_type', type=str, default='l2',
         help='Color loss type.')
+
     parser.add_argument(
         '--ssim_filter', type=int, default=6,
         help='Filter size for ssim loss.')
+        
     parser.add_argument(
         '--loss_weight', type=str, default='f,1,1,1',
         help='Loss weights for different channels.')
