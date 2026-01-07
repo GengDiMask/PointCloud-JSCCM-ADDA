@@ -31,6 +31,9 @@ parser.add_argument(
 parser.add_argument(
     '--checkpoint_dir',
     help='Directory where to save/load model checkpoints.',type=str,default='./model/block_32_norgb_ch48_downsample16_snr10_g2500_c0_resnettranspose49152_norelu_torchtest_alpha090')
+parser.add_argument(
+    '--model_name', type=str, default='model_epoch_400.pth',
+    help='The filename of the model checkpoint.')
 # 没用到
 parser.add_argument(
     '--batch_size', type=int, default=1,
@@ -107,7 +110,7 @@ vol_points = vol_points.cuda()
 # files = pc_io.get_files(args.glob_input_path)
 # filenames = np.array([os.path.split(x)[1] for x in files])
 
-MODEL_FILE = os.path.join(args.checkpoint_dir, 'model_epoch_400.pth')# 300
+MODEL_FILE = os.path.join(args.checkpoint_dir, args.model_name)
 # ae = torch.load(MODEL_FILE).cuda().eval()
 # ae = torch.load(MODEL_FILE).cuda().eval()
 ae = TAE.AutoEncoder(

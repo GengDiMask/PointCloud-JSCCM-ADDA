@@ -98,6 +98,9 @@ if __name__ == '__main__':
         '--checkpoint_dir',
         help='Directory where to save/load model checkpoints.',type=str,default='./model/block_32_norgb_ch48_downsample16_snr10_g2500_c0_resnettranspose49152_norelu_torchtest_alpha090')
     parser.add_argument(
+        '--model_name', type=str, default='model_epoch_400.pth',
+        help='The filename of the model checkpoint.')
+    parser.add_argument(
         '--batch_size', type=int, default=1,
         help='Batch size.')
     # 没用到
@@ -176,7 +179,7 @@ if __name__ == '__main__':
     x_shape = np.array([channel_num,channel_num,channel_num],np.uint16)
     y_shape = np.array([channel_num,channel_num,channel_num],np.uint16)
 
-    MODEL_FILE = os.path.join(args.checkpoint_dir, 'model_epoch_400.pth')# 第一次用的300
+    MODEL_FILE = os.path.join(args.checkpoint_dir, args.model_name)
     # ae = torch.load(MODEL_FILE).cuda().eval()
     # ae = torch.load(MODEL_FILE).cuda().eval()
     ae = TAE.AutoEncoder(
