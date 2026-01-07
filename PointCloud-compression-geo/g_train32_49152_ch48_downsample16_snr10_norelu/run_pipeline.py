@@ -72,6 +72,13 @@ def main():
     print("点云处理流程自动化脚本")
     print("="*60)
     
+    # 自动创建不存在的输出文件夹
+    output_dirs = [COMPRESSED_OUTPUT_DIR, DECOMPRESSED_OUTPUT_DIR, MERGED_OUTPUT_DIR]
+    for d in output_dirs:
+        if not os.path.exists(d):
+            os.makedirs(d, exist_ok=True)
+            print(f"已创建文件夹: {d}")
+    
     # 1. 压缩 (Compress)
     compress_cmd = [
         "python", f"{SCRIPT_DIR}/compress.py",
