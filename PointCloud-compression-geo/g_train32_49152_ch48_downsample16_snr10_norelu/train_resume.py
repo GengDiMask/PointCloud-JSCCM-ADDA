@@ -110,14 +110,14 @@ def train(resume_from=None):
         points_train, 
         batch_size=args.batch_size, 
         shuffle=True, 
-        num_workers=0,  # Windows doesn't support multiprocessing with lambda
+        num_workers=1,  # Windows doesn't support multiprocessing with lambda
         collate_fn=lambda batch: pad_collate_fn(batch, task=args.task)
     )
     val_loader = data.DataLoader(
         points_val, 
         batch_size=args.batch_size, 
         shuffle=False, 
-        num_workers=0,  # Windows doesn't support multiprocessing with lambda
+        num_workers=1,  # Windows doesn't support multiprocessing with lambda
         collate_fn=lambda batch: pad_collate_fn(batch, task=args.task)
     )
 
@@ -160,7 +160,7 @@ def train(resume_from=None):
             
             # Save to log file in dedicated 'log' folder
             log_dir = './log'
-            log_path = os.path.join(log_dir, 'train_log.txt')
+            log_path = os.path.join(log_dir, 'train_log1.txt')
             os.makedirs(log_dir, exist_ok=True)
             with open(log_path, 'a') as f:
                 f.write(f"Epoch {epoch + 1}, Train Loss: {avg_train_loss:.6f}, Val Loss: {val_loss:.6f}\n")
@@ -203,7 +203,7 @@ if __name__ == '__main__':
 
     parser.add_argument(
         '--train_glob',
-        help='Glob pattern for identifying training data.',type=str,default='./data/train/blocks_32_rgb_49152/*.ply')
+        help='Glob pattern for identifying training data.',type=str,default='../code/data/train/blocks_32_rgb_49152/*.ply')
 
     parser.add_argument(
         '--checkpoint_dir',
@@ -243,7 +243,7 @@ if __name__ == '__main__':
 
     # 每多少个epoch进行一次验证 
     parser.add_argument(
-        '--val_interval', type=int, default=10,
+        '--val_interval', type=int, default=1,
         help='Epoch interval between validation and logging.')
 
     # 没用到
@@ -326,4 +326,4 @@ if __name__ == '__main__':
 
     DATA_FORMAT = 'channels_first' if not args.channels_last else 'channels_last'
 
-    train() 
+    train(resume_from='./model/baseline_snr10/model_epoch_400.pth') 

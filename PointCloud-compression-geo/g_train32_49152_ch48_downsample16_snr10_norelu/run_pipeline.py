@@ -23,20 +23,20 @@ import time
 SCRIPT_DIR = "./PointCloud-compression-geo/g_train32_49152_ch48_downsample16_snr10_norelu"
 
 # --- 通用参数 ---
-CHECKPOINT_DIR = "./model/block_32_norgb_ch48_downsample16_snr10_g2500_c0_resnettranspose49152_norelu_torchtest_alpha090"
+CHECKPOINT_DIR = "./model/adda_adaptation"
 NUM_FILTERS = 48
 TASK = "geometry"  # geometry / color / geometry+color
 RESOLUTION = 32
 
 # --- ADDA 相关参数 (如不需要可设为 False) ---
-ENABLE_ADDA = False
+ENABLE_ADDA = True
 ADDA_BITS = 8
 ADDA_ALPHA = 1.0
 ADDA_BETA = 1.0
 
 # --- 输入/输出路径 ---
 # 1. 压缩阶段：分块好的点云 -> 压缩后的 txt
-INPUT_BLOCKS_DIR = "./data/test/forhhy/NP_supplemented/guanyin_block_32"
+INPUT_BLOCKS_DIR = "../code/data/test/longdress1300_block_32"
 COMPRESSED_OUTPUT_DIR = "./PointCloud-compression-geo/output/guanyin_compressed"
 
 # 2. 解压阶段：压缩后的 txt -> 解压后的点云块

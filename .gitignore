@@ -10,3 +10,5 @@ model/*
 # 忽略日志文件夹
 log/*
 !log/.gitkeep
+
+**/__pycache__/
