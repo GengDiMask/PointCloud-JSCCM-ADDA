@@ -200,7 +200,7 @@ if __name__ == '__main__':
     ae = ae.cuda()
     ae.eval()
 
-    for snr in range(0,21,1):
+    for snr in range(0,2,1):
         #args.output_dir = os.path.normpath(args.output_dir+'{}'.format(snr)+'dB')
         # a = os.path.normpath(args.output_dir + '{}'.format(snr) + 'dB')
         # output_files = [os.path.join(a, x + 'dB.ply') for x in filenames]

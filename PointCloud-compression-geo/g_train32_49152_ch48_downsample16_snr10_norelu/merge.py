@@ -51,7 +51,7 @@ def run(args):
         merge_pc(ori_file, div_files, args.resolution, args.div_dir, args.output_dir, args.task)
 """
 def run(args):
-    for snr in range(100, 101, 1):
+    for snr in range(0, 2, 1):
         ori_files = sorted([f for f in os.listdir(args.ori_dir) if '.ply' in f])
         print(f'There are {len(ori_files)} .ply files.')
 

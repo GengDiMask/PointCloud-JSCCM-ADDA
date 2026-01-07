@@ -9,7 +9,7 @@ from tqdm import tqdm
 import torch
 import torch.utils.data as data
 import TAE
-from train import pad_collate_fn, pc_to_torch
+from train_resume import pad_collate_fn, pc_to_torch
 from TAE import AWGNChannel
 import pc_io
 
