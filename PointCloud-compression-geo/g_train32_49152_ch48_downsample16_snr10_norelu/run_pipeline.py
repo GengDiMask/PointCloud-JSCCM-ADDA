@@ -24,6 +24,7 @@ SCRIPT_DIR = "./PointCloud-compression-geo/g_train32_49152_ch48_downsample16_snr
 
 # --- 通用参数 ---
 CHECKPOINT_DIR = "./model/block_32_norgb_ch48_downsample16_snr10_g2500_c0_resnettranspose49152_norelu_torchtest_alpha090"
+MODEL_NAME = "model_epoch_400.pth"
 NUM_FILTERS = 48
 TASK = "geometry"  # geometry / color / geometry+color
 RESOLUTION = 32
@@ -85,6 +86,7 @@ def main():
         "--input_dir", INPUT_BLOCKS_DIR,
         "--output_dir", COMPRESSED_OUTPUT_DIR,
         "--checkpoint_dir", CHECKPOINT_DIR,
+        "--model_name", MODEL_NAME,
         "--num_filters", str(NUM_FILTERS),
         "--task", TASK,
         "--resolution", str(RESOLUTION),
@@ -104,6 +106,7 @@ def main():
         "--input_dir", COMPRESSED_OUTPUT_DIR,
         "--output_dir", DECOMPRESSED_OUTPUT_DIR,
         "--checkpoint_dir", CHECKPOINT_DIR,
+        "--model_name", MODEL_NAME,
         "--num_filters", str(NUM_FILTERS),
         "--task", TASK,
         "--resolution", str(RESOLUTION),
