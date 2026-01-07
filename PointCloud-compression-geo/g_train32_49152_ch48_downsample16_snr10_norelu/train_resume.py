@@ -212,11 +212,11 @@ if __name__ == '__main__':
 
     parser.add_argument(
         '--log_dir',
-        help='Directory where to save training logs.',type=str,default='./log')
+        help='Directory where to save training logs.',type=str,default='./log/test')
 
     parser.add_argument(
         '--resume_from',
-        help='Path to a model checkpoint to resume training from.',type=str,default=None)
+        help='Path to a model checkpoint to resume training from.',type=str,default='./model/baseline_snr10/model_epoch_400.pth')
 
     parser.add_argument(#blocksize
         '--resolution',
@@ -335,4 +335,4 @@ if __name__ == '__main__':
 
     DATA_FORMAT = 'channels_first' if not args.channels_last else 'channels_last'
 
-    train(resume_from='./model/baseline_snr10/model_epoch_400.pth') 
+    train() 

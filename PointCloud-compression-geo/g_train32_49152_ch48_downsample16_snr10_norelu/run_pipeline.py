@@ -37,14 +37,14 @@ ADDA_BETA = 1.0
 # --- 输入/输出路径 ---
 # 1. 压缩阶段：分块好的点云 -> 压缩后的 txt
 INPUT_BLOCKS_DIR = "../code/data/test/longdress1300_block_32"
-COMPRESSED_OUTPUT_DIR = "./PointCloud-compression-geo/output/guanyin_compressed"
+COMPRESSED_OUTPUT_DIR = "./PointCloud-compression-geo/output/ADDA/longdress1300_compressed"
 
 # 2. 解压阶段：压缩后的 txt -> 解压后的点云块
-DECOMPRESSED_OUTPUT_DIR = "./PointCloud-compression-geo/decompressed/guanyin_decompressed"
+DECOMPRESSED_OUTPUT_DIR = "./PointCloud-compression-geo/decompressed/ADDA/longdress1300_decompressed"
 
 # 3. 合并阶段：解压后的点云块 -> 完整点云
-ORIGINAL_PC_DIR = "./data/test/forhhy/NP_supplemented/guanyin"  # 用于获取原始文件名
-MERGED_OUTPUT_DIR = "./PointCloud-compression-geo/merged/guanyin_merged"
+ORIGINAL_PC_DIR = "../code/data/test/longdress1300"  # 用于获取原始文件名
+MERGED_OUTPUT_DIR = "./PointCloud-compression-geo/merged/ADDA/longdress1300_merged"
 
 # ================================================================================
 # 以下代码无需修改
