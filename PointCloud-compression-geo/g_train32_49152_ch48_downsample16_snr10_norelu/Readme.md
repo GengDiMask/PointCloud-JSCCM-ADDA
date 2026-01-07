@@ -93,11 +93,26 @@ DAC/ADC 的有限分辨率（如 8-bit, 10-bit）引入量化误差。
 ### 5.3 详细执行步骤 (Execution Steps)
 
 #### 步骤一：基准模型训练 (Baseline Training)
-首先在纯 AWGN 信道下训练模型，获得一个良好的预训练权重。
+
+你可以选择从零开始训练，或者指定一个已有的 checkpoint 继续训练。
+
+**A. 从零开始训练 (Start from scratch)**:
+确保 `--resume_from` 为空或不指定（如果默认值为 None）。
 ```bash
-# 训练基准模型 (无 ADDA, SNR=10dB)
-python train_resume.py --num_filters 48 --task geometry --checkpoint_dir ./model/baseline_snr10
+# 默认从零开始 (需确保代码中 default=None)
+python train_resume.py --checkpoint_dir ./model/baseline_snr10 --log_dir ./log/baseline
+
+# 或者显式指定为空字符串
+python train_resume.py --resume_from "" --checkpoint_dir ./model/baseline_snr10
 ```
+
+**B. 从检查点恢复训练 (Resume from checkpoint)**:
+```bash
+# 指定要加载的 .pth 文件路径
+python train_resume.py --resume_from ./model/baseline_snr10/model_epoch_400.pth --checkpoint_dir ./model/baseline_snr10_resumed
+```
+
+*注意：训练过程中会根据文件名（如 `model_epoch_400.pth`）自动提取起始 Epoch 编号，从而实现无缝衔接。*
 
 #### 步骤二：ADDA 适应性训练 (Adaptation Training)
 加载步骤一的权重，开启 ADDA 补偿模式进行微调。
