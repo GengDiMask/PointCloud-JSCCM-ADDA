@@ -80,8 +80,9 @@ def pc_to_torch(points, dense_tensor_shape, task, channels_last=False):
     st = torch.sparse_coo_tensor(indices.t(), values, size=dense_tensor_shape)
 
     return st
-def train(resume_from=None):
+def train():
     """Train the model."""
+    resume_from = args.resume_from
     p_min, p_max, dense_tensor_shape = pc_io.get_shape_data(
         args.task, args.resolution, args.channels_last)
     files = pc_io.get_files(args.train_glob)
@@ -158,8 +159,8 @@ def train(resume_from=None):
         if (epoch + 1) % args.val_interval == 0:
             val_loss = validate(ae, val_loader, device, criterion)
             
-            # Save to log file in dedicated 'log' folder
-            log_dir = './log'
+            # Save to log file in dedicated logging folder
+            log_dir = args.log_dir
             log_path = os.path.join(log_dir, 'train_log.txt')
             os.makedirs(log_dir, exist_ok=True)
             with open(log_path, 'a') as f:
@@ -207,7 +208,15 @@ if __name__ == '__main__':
 
     parser.add_argument(
         '--checkpoint_dir',
-        help='Directory where to save/load model checkpoints.',type=str,default='./model/baseline_snr10')
+        help='Directory where to save model checkpoints.',type=str,default='./model/baseline_snr10')
+
+    parser.add_argument(
+        '--log_dir',
+        help='Directory where to save training logs.',type=str,default='./log')
+
+    parser.add_argument(
+        '--resume_from',
+        help='Path to a model checkpoint to resume training from.',type=str,default=None)
 
     parser.add_argument(#blocksize
         '--resolution',
