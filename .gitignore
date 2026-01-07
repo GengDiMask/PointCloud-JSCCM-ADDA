@@ -12,3 +12,12 @@ log/*
 !log/.gitkeep
 
 **/__pycache__/
+
+PointCloud-compression-geo/output/*
+!PointCloud-compression-geo/output/.gitkeep
+
+PointCloud-compression-geo/decompressed/*
+!PointCloud-compression-geo/decompressed/.gitkeep
+
+PointCloud-compression-geo/merged/*
+!PointCloud-compression-geo/merged/.gitkeep
