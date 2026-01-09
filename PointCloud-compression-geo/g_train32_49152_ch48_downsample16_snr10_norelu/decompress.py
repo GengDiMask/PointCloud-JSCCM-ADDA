@@ -68,7 +68,24 @@ def load_compressed_files(files):
 def quantize_tensor(x):
     x = torch.round(x)  # 四舍五入
     x = x.to(dtype=torch.uint8)  # 转换为 uint8 类型
+    return x
 
+def ADDA_channel(x, snr, bits, alpha, beta):
+    """
+    Apply ADDA channel impairments using Numpy (Non-linearity -> Quantization -> AWGN).
+    """
+    # 1. Non-linearity (DAC saturation)
+    # Model: y = alpha * tanh(beta * x)
+    x = alpha * np.tanh(beta * x)
+    
+    # 2. Quantization (DAC resolution limit)
+    scale = 2 ** (bits - 1)
+    x = np.round(x * scale) / scale
+    
+    # 3. Physical Channel (AWGN)
+    # Reuse the existing AWGN_channel function
+    x = AWGN_channel(x, snr)
+    
     return x
 
 
@@ -205,9 +222,14 @@ if __name__ == '__main__':
         # a = os.path.normpath(args.output_dir + '{}'.format(snr) + 'dB')
         # output_files = [os.path.join(a, x + 'dB.ply') for x in filenames]
         if args.enable_adda:
-            # Use ADDA channel from the model (Disable numpy AWGN)
-            ae.awgnchannel.awgn.snr = snr
-            code_input = compressed_data.astype(np.float32)
+            # Use Numpy implementations for ADDA channel
+            code_input = ADDA_channel(
+                compressed_data, 
+                snr, 
+                args.adda_bits, 
+                args.adda_alpha, 
+                args.adda_beta
+            ).astype(np.float32)
         else:
             # Use original numpy AWGN channel
             code_input = AWGN_channel(compressed_data, snr).astype(np.float32)
@@ -227,16 +249,14 @@ if __name__ == '__main__':
                     y_tensor = torch.from_numpy(y).float()# 32
                     y_tensor = y_tensor.cuda()
                     
-                    if args.enable_adda:
-                        # Add batch dimension for module compatibility: (C,D,H,W) -> (1,C,D,H,W)
-                        y_tensor = y_tensor.unsqueeze(0)
-                        # Apply ADDA channel (Pre-distortion/Non-linearity/Quantization/AWGN)
-                        y_tensor = ae.awgnchannel(y_tensor)
-                        y1 = ae.decoder(y_tensor)
-                        # Remove batch dimension
-                        y1 = y1.squeeze(0)
-                    else:
-                        y1=ae.decoder(y_tensor)
+                    # Add batch dimension: (C,D,H,W) -> (1,C,D,H,W)
+                    # Necessary because the model expects a batch dimension (N, ...)
+                    y_tensor = y_tensor.unsqueeze(0) 
+                    
+                    y1 = ae.decoder(y_tensor)
+                    
+                    # Remove batch dimension for post-processing
+                    y1 = y1.squeeze(0)
 
                     y1_quant=quantize_tensor(y1)
                     y1_quant_np = y1_quant.cpu().numpy()
