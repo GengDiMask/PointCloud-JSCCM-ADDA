@@ -1,5 +1,18 @@
 {
     "python.defaultInterpreterPath": "/home/mjy/anaconda3/envs/mjy/bin/python",
     "python.analysis.indexing": false,
-    "python.experiments.enabled": false
+    "python.experiments.enabled": false,
+    "python.experiments.optOutFrom": [
+        "pythonDiscoveryModule",
+        "pythonDiscoveryModuleWithCache",
+        "All"
+    ],
+    "python.terminal.activateEnvInSelectedTerminal": false,
+    "files.watcherExclude": {
+        "**/.git/objects/**": true,
+        "**/.git/subtree-cache/**": true,
+        "**/node_modules/**": true,
+        "**/data1/**": true,
+        "**/data/**": true
+    }
 }

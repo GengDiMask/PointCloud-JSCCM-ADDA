@@ -87,16 +87,16 @@ if __name__ == '__main__':
         help='Geometry mesh detection pattern.',type=str,default='*.ply')
     parser.add_argument(
         '--input_dir',
-        help='Input directory.',type=str,default='./PointCloud-compression-geo/output/guanyin_block32_testtime_resnettranspose49152_norelu_ch48_down16_snr10_g2500_train32_nocolor_alpha090_model400_compressed')
+        help='Input directory.',type=str,default='./PointCloud-compression-geo/output/test')
     parser.add_argument(
         '--input_pattern',
         help='Mesh detection pattern.',type=str,default='*.ply.txt')
     parser.add_argument(
         '--output_dir',
-        help='Output directory.',type=str,default='./PointCloud-compression-geo/decompressed/guanyin_block32_torch_resnettranspose49152_norelu_ch48_down16_snr10_g2500_train32_nocolor_alpha090_model400_compressed_decompressed_testtime/')
+        help='Output directory.',type=str,default='./PointCloud-compression-geo/decompressed/test/')
     parser.add_argument(
         '--checkpoint_dir',
-        help='Directory where to save/load model checkpoints.',type=str,default='./model/block_32_norgb_ch48_downsample16_snr10_g2500_c0_resnettranspose49152_norelu_torchtest_alpha090')
+        help='Directory where to save/load model checkpoints.',type=str,default='./model/baseline_snr10_nocur')
     parser.add_argument(
         '--model_name', type=str, default='model_epoch_400.pth',
         help='The filename of the model checkpoint.')
