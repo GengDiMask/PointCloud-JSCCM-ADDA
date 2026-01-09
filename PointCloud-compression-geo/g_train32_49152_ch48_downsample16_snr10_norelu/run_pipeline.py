@@ -34,6 +34,9 @@ ENABLE_ADDA = True
 ADDA_BITS = 8
 ADDA_ALPHA = 1.0
 ADDA_BETA = 1.0
+NONLINEARITY = "rapp" # 'rapp' or 'tanh'
+ADDA_P = 3.0
+ADDA_SAT = 1.0
 
 # --- 输入/输出路径 ---
 # 1. 压缩阶段：分块好的点云 -> 压缩后的 txt
@@ -97,6 +100,9 @@ def main():
             "--adda_bits", str(ADDA_BITS),
             "--adda_alpha", str(ADDA_ALPHA),
             "--adda_beta", str(ADDA_BETA),
+            "--nonlinearity", NONLINEARITY,
+            "--adda_p", str(ADDA_P),
+            "--adda_sat", str(ADDA_SAT),
         ])
     run_command(compress_cmd, "Step 1: Compress")
 
@@ -117,6 +123,9 @@ def main():
             "--adda_bits", str(ADDA_BITS),
             "--adda_alpha", str(ADDA_ALPHA),
             "--adda_beta", str(ADDA_BETA),
+            "--nonlinearity", NONLINEARITY,
+            "--adda_p", str(ADDA_P),
+            "--adda_sat", str(ADDA_SAT),
         ])
     run_command(decompress_cmd, "Step 2: Decompress")
 

@@ -99,7 +99,10 @@ def train():
         enable_adda=args.enable_adda,
         adda_bits=args.adda_bits,
         adda_alpha=args.adda_alpha,
-        adda_beta=args.adda_beta
+        adda_beta=args.adda_beta,
+        nonlinearity=args.nonlinearity,
+        adda_p=args.adda_p,
+        adda_sat=args.adda_sat
     ).cuda()
     criterion = TAE.get_loss().cuda()
 
@@ -326,6 +329,16 @@ if __name__ == '__main__':
     parser.add_argument(
         '--adda_beta', type=float, default=1.0,
         help='ADDA non-linearity parameter beta.')
+        
+    parser.add_argument(
+        '--nonlinearity', type=str, default='rapp', choices=['tanh', 'rapp'],
+        help='Type of ADDA nonlinearity (tanh or rapp).')
+    parser.add_argument(
+        '--adda_p', type=float, default=3.0,
+        help='Smoothness parameter p for Rapp model.')
+    parser.add_argument(
+        '--adda_sat', type=float, default=1.0,
+        help='Saturation voltage V_sat for Rapp model.')
 
     args = parser.parse_args()
 
