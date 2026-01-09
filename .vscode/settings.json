@@ -1,1 +1,5 @@
-{}
+{
+    "python.defaultInterpreterPath": "/home/mjy/anaconda3/envs/mjy/bin/python",
+    "python.analysis.indexing": false,
+    "python.experiments.enabled": false
+}

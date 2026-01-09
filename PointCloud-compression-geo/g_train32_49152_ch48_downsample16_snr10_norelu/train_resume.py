@@ -208,11 +208,11 @@ if __name__ == '__main__':
 
     parser.add_argument(
         '--checkpoint_dir',
-        help='Directory where to save model checkpoints.',type=str,default='./model/baseline_snr10')
+        help='Directory where to save model checkpoints.',type=str,default='./model/baseline_snr10_nocur')
 
     parser.add_argument(
         '--log_dir',
-        help='Directory where to save training logs.',type=str,default='./log/test')
+        help='Directory where to save training logs.',type=str,default='./log/zero')
 
     parser.add_argument(
         '--resume_from',

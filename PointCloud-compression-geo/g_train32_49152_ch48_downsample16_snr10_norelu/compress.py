@@ -21,16 +21,16 @@ parser = argparse.ArgumentParser(
 
 parser.add_argument(
         '--input_dir',
-        help='Input directory.',type=str,default='./data/test/forhhy/NP_supplemented/guanyin_block_32')# './data/test/forhhy/rhetorician_block_32'
+        help='Input directory.',type=str,default='../code/data/test/longdress1300_block_32')# './data/test/forhhy/rhetorician_block_32'
 parser.add_argument(
     '--input_pattern',
     help='Mesh detection pattern.',type=str,default='*.ply')
 parser.add_argument(
     '--output_dir',
-    help='Output directory.',type=str,default='./PointCloud-compression-geo/output/guanyin_block32_testtime_resnettranspose49152_norelu_ch48_down16_snr10_g2500_train32_nocolor_alpha090_model400_compressed')
+    help='Output directory.',type=str,default='./PointCloud-compression-geo/output/test')
 parser.add_argument(
     '--checkpoint_dir',
-    help='Directory where to save/load model checkpoints.',type=str,default='./model/block_32_norgb_ch48_downsample16_snr10_g2500_c0_resnettranspose49152_norelu_torchtest_alpha090')
+    help='Directory where to save/load model checkpoints.',type=str,default='./model/baseline_snr10_nocur')
 parser.add_argument(
     '--model_name', type=str, default='model_epoch_400.pth',
     help='The filename of the model checkpoint.')
@@ -94,7 +94,7 @@ p_min, p_max, dense_tensor_shape = pc_io.get_shape_data(args.task, args.resoluti
 points = pc_io.load_points(files, p_min, p_max, args.task, batch_size=args.read_batch_size)
 
 vol_points = pad_collate_fn(points,task=args.task)
-vol_points = vol_points.cuda()
+vol_points = vol_points.cuda() # [917 ,1 ,32 ,32 ,32]
 
 
 
@@ -136,7 +136,7 @@ ae.eval()
 with torch.no_grad():
     # for i in tqdm(range(len(filenames))):
     for i in range(len(filenames)):
-        y=ae.encoder(vol_points[i])
+        y=ae.encoder(vol_points[i]) # [1,32,32,32]-> [48,2,2,2]
         representation = torch.flatten(y)
         representation = representation.cpu().numpy()
         np.savetxt(output_files[i],representation,fmt = '%f', delimiter = ',')
