@@ -81,9 +81,13 @@ python decompress.py --input_dir <压缩数据路径> --output_dir <重建输出
 需要在 `TAE.py` 中扩展 `AWGNChannel` 或新增 `ADDAChannel` 类。
 
 #### A. ADDA 非线性模型 (Non-linearity)
-ADDA 的传输特性曲线通常呈现 S 型饱和或非线性。可用以下模型模拟：
--   **模型公式**: $y = \alpha \cdot \tanh(\beta \cdot x)$ 或多项式模型 $y = x + a_3 x^3 + a_5 x^5$。
--   在 `TAE.py` 中实现一个 `NonLinearLayer`，参数 $\alpha, \beta$ 或 $a_n$ 可设为可学习参数或根据器件手册固定。
+ADDA 的传输特性曲线通常呈现 S 型饱和或非线性。为了更真实地模拟物理器件（如固态功率放大器 SSPA），本项目支持两种模型：
+1.  **Rapp 模型 (Rapp Model)**：通信领域标准的功放行为模型，模拟平滑饱和特性。
+    *   公式：$V_{out} = \frac{V_{in}}{\left(1 + \left(\frac{|V_{in}|}{V_{sat}}\right)^{2p}\right)^{\frac{1}{2p}}}$
+2.  **Tanh 模型 (Tanh Model)**：简单的双曲正切饱和模型，作为 Baseline。
+    *   公式：$V_{out} = \alpha \cdot \tanh(\beta \cdot V_{in})$
+
+在 `TAE.py` 中已实现这两种模型，可通过 `--nonlinearity` 参数进行切换。
 
 #### B. 量化噪声 (Quantization)
 DAC/ADC 的有限分辨率（如 8-bit, 10-bit）引入量化误差。
@@ -116,29 +120,72 @@ python train_resume.py --resume_from ./model/baseline_snr10/model_epoch_400.pth 
 
 #### 步骤二：ADDA 适应性训练 (Adaptation Training)
 加载步骤一的权重，开启 ADDA 补偿模式进行微调。
+
+本项目支持两种非线性模型：**Rapp 模型** (推荐，更符合物理特性) 和 **Tanh 模型** (Baseline)。
+
+**A. 使用 Rapp 模型 (推荐)**
+Rapp 模型是固态功率放大器 (SSPA) 的标准行为模型。
+公式：$$ V_{out} = \frac{V_{in}}{\left(1 + \left(\frac{|V_{in}|}{V_{sat}}\right)^{2p}\right)^{\frac{1}{2p}}} $$
+*   `--adda_p`: 平滑因子，控制线性区到饱和区的过渡陡峭程度（典型值 2~3）。
+*   `--adda_sat`: 饱和电压 $V_{sat}$，限制最大输出幅度。
+
 ```bash
-# 加载预训练模型，开启 ADDA (8-bit 量化, alpha=1.0, beta=1.0)
-python train_resume.py \
+# 使用 Rapp 模型训练 (p=3.0, sat=1.0)
+python train_resume.py --checkpoint_dir ./model/adda_rapp_snr10 \
+    --resume_from ./model/baseline_snr10/model_epoch_400.pth \
     --enable_adda \
+    --nonlinearity rapp \
+    --adda_p 3.0 \
+    --adda_sat 1.0 \
     --adda_bits 8 \
+    --log_dir ./log/adda_rapp
+```
+
+**B. 使用 Tanh 模型 (Baseline)**
+简单的双曲正切饱和模型。
+公式：$$ V_{out} = \alpha \cdot \tanh(\beta \cdot V_{in}) $$
+*   `--adda_alpha`: 幅度缩放因子。
+*   `--adda_beta`: 输入增益因子。
+
+```bash
+# 使用 Tanh 模型训练
+python train_resume.py --checkpoint_dir ./model/adda_tanh_snr10 \
+    --resume_from ./model/baseline_snr10/model_epoch_400.pth \
+    --enable_adda \
+    --nonlinearity tanh \
     --adda_alpha 1.0 \
     --adda_beta 1.0 \
-    --checkpoint_dir ./model/adda_adaptation \
-    --resume_from ./model/baseline_snr10/model_epoch_XXX.pth
+    --adda_bits 8 \
+    --log_dir ./log/adda_tanh
 ```
-*注意：需在 `train_resume.py` 中手动指定 `resume_from` 路径或修改代码中的默认路径。*
+
+### 5.4. 非线性模型对比 (Nonlinearity Config)
+
+| 特性 | Rapp 模型 (`--nonlinearity rapp`) | Tanh 模型 (`--nonlinearity tanh`) |
+| :--- | :--- | :--- |
+| **物理意义** | 专为固态功放 (SSPA) 设计，精确模拟 AM/AM 转换 | 通用饱和函数，非特定物理模型 |
+| **关键参数** | `p` (平滑度), `sat` (饱和电平) | `alpha` (幅度), `beta` (增益) |
+| **行为** | 在低幅值区高度线性，接近饱和时平滑过渡 | 全局非线性，即使在低幅值区也有轻微失真 |
+| **适用场景** | **高精度物理仿真**，模拟真实功放特性 | **理论研究**，作为简单的基准对比 |
+
+> [!NOTE]
+> **训练与测试的一致性**：
+> 为了解决训练中不可导或梯度消失的问题，我们在代码内部实现了策略优化：
+> *   **训练时 (Training)**: 使用 PyTorch 实现的可导 Rapp/Tanh 公式，支持自动微分。
+> *   **测试时 (Testing/Decompress)**: 使用 Numpy 实现的**完全一致**的数学公式，确保测试结果真实反映物理特性。
 
 #### 步骤三：模型测试与压缩 (Testing/Compression)
 使用训练好的 ADDA 补偿模型进行点云压缩。
 ```bash
 python compress.py \
     --enable_adda \
+    --nonlinearity rapp \
+    --adda_p 3.0 \
+    --adda_sat 1.0 \
     --adda_bits 8 \
-    --adda_alpha 1.0 \
-    --adda_beta 1.0 \
-    --checkpoint_dir ./model/adda_adaptation \
+    --checkpoint_dir ./model/adda_rapp_snr10 \
     --input_dir ./data/test/blocks \
-    --output_dir ./output/compressed_adda
+    --output_dir ./output/compressed_rapp
 ```
 
 #### 步骤四：模型解压与验证 (Decompression)

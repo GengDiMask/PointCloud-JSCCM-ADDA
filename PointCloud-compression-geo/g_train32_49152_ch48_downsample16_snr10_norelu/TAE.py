@@ -43,17 +43,34 @@ class QuantizationLayer(torch.autograd.Function):
 
 
 class ADDAChannel(nn.Module):
-    def __init__(self, snr, bits=8, alpha=1.0, beta=1.0):
+    def __init__(self, snr, bits=8, alpha=1.0, beta=1.0, nonlinearity='rapp', p=3.0, sat=1.0):
         super(ADDAChannel, self).__init__()
         self.awgn = AWGNChannel(snr)
         self.bits = bits
         self.alpha = alpha
         self.beta = beta
+        self.nonlinearity = nonlinearity
+        self.p = p
+        self.sat = sat
         
+    def _tanh_model(self, x):
+        # Model: y = alpha * tanh(beta * x)
+        return self.alpha * torch.tanh(self.beta * x)
+
+    def _rapp_model(self, x):
+        # Rapp Model: V_out = V_in / (1 + (|V_in| / V_sat)^(2p))^(1/2p)
+        # This is fully differentiable.
+        # We add a small epsilon to avoid division by zero if necessary, though Rapp is generally stable.
+        num = x
+        den = (1 + (torch.abs(x) / self.sat).pow(2 * self.p)).pow(1 / (2 * self.p))
+        return num / den
+
     def forward(self, x):
         # 1. Non-linearity (DAC/ADC saturation simulation)
-        # Model: y = alpha * tanh(beta * x)
-        x = self.alpha * torch.tanh(self.beta * x) 
+        if self.nonlinearity == 'rapp':
+            x = self._rapp_model(x)
+        else:
+            x = self._tanh_model(x)
         
         # 2. Quantization (DAC resolution limit)
         x = QuantizationLayer.apply(x, self.bits)
@@ -174,11 +191,19 @@ class DecoderNetwork(nn.Module):
         x = torch.sigmoid(self.conv3(x))
         return x
 class AutoEncoder(nn.Module):
-    def __init__(self, num_filters, task, snr, enable_adda=False, adda_bits=8, adda_alpha=1.0, adda_beta=1.0):
+    def __init__(self, num_filters, task, snr, enable_adda=False, adda_bits=8, adda_alpha=1.0, adda_beta=1.0, nonlinearity='rapp', adda_p=3.0, adda_sat=1.0):
         super(AutoEncoder, self).__init__()
         self.encoder = EncoderNetwork(task, num_filters)
         if enable_adda:
-            self.awgnchannel = ADDAChannel(snr, bits=adda_bits, alpha=adda_alpha, beta=adda_beta)
+            self.awgnchannel = ADDAChannel(
+                snr, 
+                bits=adda_bits, 
+                alpha=adda_alpha, 
+                beta=adda_beta,
+                nonlinearity=nonlinearity,
+                p=adda_p,
+                sat=adda_sat
+            )
         else:
             self.awgnchannel = AWGNChannel(snr)
         self.decoder = DecoderNetwork(task, num_filters)

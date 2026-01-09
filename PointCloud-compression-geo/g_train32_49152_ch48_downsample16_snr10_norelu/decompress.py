@@ -70,13 +70,19 @@ def quantize_tensor(x):
     x = x.to(dtype=torch.uint8)  # 转换为 uint8 类型
     return x
 
-def ADDA_channel(x, snr, bits, alpha, beta):
+def ADDA_channel(x, snr, bits, alpha, beta, nonlinearity='rapp', p=3.0, sat=1.0):
     """
     Apply ADDA channel impairments using Numpy (Non-linearity -> Quantization -> AWGN).
     """
     # 1. Non-linearity (DAC saturation)
-    # Model: y = alpha * tanh(beta * x)
-    x = alpha * np.tanh(beta * x)
+    if nonlinearity == 'rapp':
+        # Rapp Model
+        num = x
+        den = np.power(1 + np.power(np.abs(x) / sat, 2 * p), 1 / (2 * p))
+        x = num / den
+    else:
+        # Tanh Model: y = alpha * tanh(beta * x)
+        x = alpha * np.tanh(beta * x)
     
     # 2. Quantization (DAC resolution limit)
     scale = 2 ** (bits - 1)
@@ -160,6 +166,16 @@ if __name__ == '__main__':
     parser.add_argument(
         '--adda_beta', type=float, default=1.0,
         help='ADDA non-linearity parameter beta.')
+        
+    parser.add_argument(
+        '--nonlinearity', type=str, default='rapp', choices=['tanh', 'rapp'],
+        help='Type of ADDA nonlinearity (tanh or rapp).')
+    parser.add_argument(
+        '--adda_p', type=float, default=3.0,
+        help='Smoothness parameter p for Rapp model.')
+    parser.add_argument(
+        '--adda_sat', type=float, default=1.0,
+        help='Saturation voltage V_sat for Rapp model.')
 
     args = parser.parse_args()
 
@@ -206,7 +222,10 @@ if __name__ == '__main__':
         enable_adda=args.enable_adda,
         adda_bits=args.adda_bits,
         adda_alpha=args.adda_alpha,
-        adda_beta=args.adda_beta
+        adda_beta=args.adda_beta,
+        nonlinearity=args.nonlinearity,
+        adda_p=args.adda_p,
+        adda_sat=args.adda_sat
     )  # 根据你的模型参数进行调整
 
     # 加载模型状态字典
@@ -228,7 +247,10 @@ if __name__ == '__main__':
                 snr, 
                 args.adda_bits, 
                 args.adda_alpha, 
-                args.adda_beta
+                args.adda_beta,
+                nonlinearity=args.nonlinearity,
+                p=args.adda_p,
+                sat=args.adda_sat
             ).astype(np.float32)
         else:
             # Use original numpy AWGN channel
