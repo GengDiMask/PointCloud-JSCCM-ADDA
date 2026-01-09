@@ -72,9 +72,19 @@ def quantize_tensor(x):
 
 def ADDA_channel(x, snr, bits, alpha, beta, nonlinearity='rapp', p=3.0, sat=1.0):
     """
-    Apply ADDA channel impairments using Numpy (Non-linearity -> Quantization -> AWGN).
+    Apply ADDA channel impairments using Numpy (Quantization -> INL -> Non-linearity -> AWGN).
     """
-    # 1. Non-linearity (DAC saturation)
+    inl_gamma = 0.01  # Fixed internal parameter
+
+    # 1. Quantization (DAC resolution limit)
+    scale = 2 ** (bits - 1)
+    x = np.round(x * scale) / scale
+
+    # 2. INL (Integral Non-Linearity)
+    # Cubic distortion
+    x = x + inl_gamma * np.power(x, 3)
+
+    # 3. Non-linearity (PA saturation)
     if nonlinearity == 'rapp':
         # Rapp Model
         num = x
@@ -84,11 +94,7 @@ def ADDA_channel(x, snr, bits, alpha, beta, nonlinearity='rapp', p=3.0, sat=1.0)
         # Tanh Model: y = alpha * tanh(beta * x)
         x = alpha * np.tanh(beta * x)
     
-    # 2. Quantization (DAC resolution limit)
-    scale = 2 ** (bits - 1)
-    x = np.round(x * scale) / scale
-    
-    # 3. Physical Channel (AWGN)
+    # 4. Physical Channel (AWGN)
     # Reuse the existing AWGN_channel function
     x = AWGN_channel(x, snr)
     

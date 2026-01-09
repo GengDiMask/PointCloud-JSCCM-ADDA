@@ -52,30 +52,33 @@ class ADDAChannel(nn.Module):
         self.nonlinearity = nonlinearity
         self.p = p
         self.sat = sat
-        
+        self.inl_gamma = 0.01  # Fixed internal parameter for DAC INL
+
     def _tanh_model(self, x):
         # Model: y = alpha * tanh(beta * x)
         return self.alpha * torch.tanh(self.beta * x)
 
     def _rapp_model(self, x):
         # Rapp Model: V_out = V_in / (1 + (|V_in| / V_sat)^(2p))^(1/2p)
-        # This is fully differentiable.
-        # We add a small epsilon to avoid division by zero if necessary, though Rapp is generally stable.
         num = x
         den = (1 + (torch.abs(x) / self.sat).pow(2 * self.p)).pow(1 / (2 * self.p))
         return num / den
 
     def forward(self, x):
-        # 1. Non-linearity (DAC/ADC saturation simulation)
+        # 1. Quantization (DAC resolution limit)
+        x = QuantizationLayer.apply(x, self.bits)
+
+        # 2. INL (Integral Non-Linearity for DAC)
+        # Cubic distortion: y = x + gamma * x^3
+        x = x + self.inl_gamma * torch.pow(x, 3)
+
+        # 3. Non-linearity (PA Saturation)
         if self.nonlinearity == 'rapp':
             x = self._rapp_model(x)
         else:
             x = self._tanh_model(x)
         
-        # 2. Quantization (DAC resolution limit)
-        x = QuantizationLayer.apply(x, self.bits)
-        
-        # 3. Physical Channel (AWGN)
+        # 4. Physical Channel (AWGN)
         x = self.awgn(x)
         
         return x

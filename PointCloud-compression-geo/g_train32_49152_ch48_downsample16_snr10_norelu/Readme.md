@@ -81,13 +81,68 @@ python decompress.py --input_dir <压缩数据路径> --output_dir <重建输出
 需要在 `TAE.py` 中扩展 `AWGNChannel` 或新增 `ADDAChannel` 类。
 
 #### A. ADDA 非线性模型 (Non-linearity)
-ADDA 的传输特性曲线通常呈现 S 型饱和或非线性。为了更真实地模拟物理器件（如固态功率放大器 SSPA），本项目支持两种模型：
-1.  **Rapp 模型 (Rapp Model)**：通信领域标准的功放行为模型，模拟平滑饱和特性。
-    *   公式：$V_{out} = \frac{V_{in}}{\left(1 + \left(\frac{|V_{in}|}{V_{sat}}\right)^{2p}\right)^{\frac{1}{2p}}}$
-2.  **Tanh 模型 (Tanh Model)**：简单的双曲正切饱和模型，作为 Baseline。
-    *   公式：$V_{out} = \alpha \cdot \tanh(\beta \cdot V_{in})$
+为了实现物理层面的精确优化，本项目对 **"Digital -> Analog -> PA -> Channel"** 的完整信号转换链路进行了精细建模。
+新的信号处理顺序如下（物理逆序修正）：
+**Quantization (DAC) -> INL (DAC Distortion) -> Nonlinearity (PA) -> AWGN (Channel)**
 
-在 `TAE.py` 中已实现这两种模型，可通过 `--nonlinearity` 参数进行切换。
+本项目包含以下两个核心非线性组件：
+
+1.  **DAC 积分非线性 (Integral Non-Linearity, INL)** [**内置强制**]:
+    *   为了针对真实 DAC 的非理性进行优化，代码中**内置并强制**了一个系数为 $\gamma=0.01$ 的三次谐波失真。
+    *   公式：$$ V_{dac} = V_{quantized} + 0.01 \cdot V_{quantized}^3 $$
+    *   该失真模拟了 DAC 转换过程中的本征非线性误差。
+    *   **相关研究**: 多项式模型是描述 DAC/ADC INL 的经典方法 [1]；近年来，利用神经网络来建模和补偿 INL 已成为热点研究 [2][3]。
+
+2.  **PA 功率放大器模型 (Power Amplifier Model)** [可选]:
+    支持两种模型，作用于经过 DAC/INL 失真后的模拟信号：
+    *   **Rapp 模型 (Rapp Model, 推荐)**：
+        *   **来源**: C. Rapp, "Effects of HPA-nonlinearity on a 4-DPSK/OFDM-signal for a digital sound broadcasting system," in *Proc. ECSC*, 1991.
+        *   **适用性**: 固态功率放大器 (SSPA) 的标准行为模型。
+        *   公式：$$ V_{out} = \frac{V_{in}}{\left(1 + \left(\frac{|V_{in}|}{V_{sat}}\right)^{2p}\right)^{\frac{1}{2p}}} $$
+        *   **参数说名**: 
+            *   $V_{sat}$: **饱和电压** (Saturation Voltage)，即功放能输出的最大电压幅值。
+            *   $p$: **平滑因子** (Smoothness Factor)，控制线性区到饱和区的过渡陡峭程度。
+    *   **Tanh 模型 (Tanh Model, Baseline)**：
+        *   **适用性**: 简单的双曲正切饱和模型。
+        *   公式：$$ V_{out} = \alpha \cdot \tanh(\beta \cdot V_{in}) $$
+
+在 `TAE.py` 中，信号会依次经过 `Quantization` -> `INL` -> `Rapp/Tanh` -> `AWGN`，确保神经网络能学习到对抗全链路非线性的能力。
+
+#### 参考文献 (References)
+[1] F. Maloberti, *Data Converters*, Springer, 2007. (Classic reference on ADC/DAC non-idealities including INL/DNL)
+
+[2] J. Mullrich et al., "Data Converter Nonlinearity in Automotive Radar: Modeling, Estimation and Compensation," *IEEE Access*, 2022. (Discusses polynomial modeling of INL)
+
+[3] K. Hornik et al., "Multilayer Feedforward Networks are Universal Approximators," *Neural Networks*, 1989. (Theoretical basis for NN compensation)
+
+[4] Y. LeCun et al., "Deep Learning," *Nature*, 2015. (General deep learning for complex function approximation)
+
+### 5.4 参数物理意义与选取指南 (Parameter Selection Guide)
+
+为了方便实验，以下对关键参数的选取依据进行详细解释：
+
+**1. DAC INL 系数 ($\gamma$)**
+*   **代码默认值**: `0.01`
+*   **物理含义**: 模拟 DAC 传输曲线的三次谐波失真分量。$\gamma=0.01$ 意味着在满量程输入时，由非线性引起的误差幅度约为信号幅度的 1% (即 -40dB 左右的谐波失真)。
+*   **选取建议**:
+    *   **0.01 (1%)**: 典型商用中低端 DAC 或未校准 DAC 的表现，适合测试模型的鲁棒性。
+    *   **0.001 (0.1%)**: 高精度 DAC 的表现。
+    *   **0.05 - 0.1**: 极端恶劣环境或低成本器件，用于压力测试。
+
+**2. Rapp 模型平滑因子 ($p$)**
+*   **代码默认值**: `3.0`
+*   **物理含义**: 控制功放从线性区进入饱和区的 "膝部 (Knee)" 锐度。值越大，线性区越长，进入饱和越突然。
+*   **选取建议**:
+    *   **$p \approx 2.0$**: 典型的 GaAs (砷化镓) 功率放大器，过渡较平缓。
+    *   **$p \approx 3.0$**: 典型的 GaN (氮化镓) 或 LDMOS 功率放大器，现代通信系统中最常用的经验值。
+    *   **$p \to \infty$**: 理想软限幅器 (Ideal Clipper)。
+
+**3. 饱和电压 ($V_{sat}$)**
+*   **代码默认值**: `1.0`
+*   **物理含义**: 功放的输出“天花板”。这并非为了主动限制 PAPR，而是模拟物理器件因供电电压有限而无法输出无限大信号的特性。当信号峰值超过此值时，会被压缩或截断，客观上确实会降低 PAPR，但也带来了非线性失真。
+*   **选取建议**:
+    *   **$V_{sat}=1.0$**: 标准配置。
+    *   **$V_{sat} \to \infty$ (如 100.0)**: **模拟理想线性功放 (Ideal PA)**。此时相当于**不限制**，即仅有 DAC 量化噪声，没有任何 PA 饱和非线性。
 
 #### B. 量化噪声 (Quantization)
 DAC/ADC 的有限分辨率（如 8-bit, 10-bit）引入量化误差。
@@ -130,15 +185,15 @@ Rapp 模型是固态功率放大器 (SSPA) 的标准行为模型。
 *   `--adda_sat`: 饱和电压 $V_{sat}$，限制最大输出幅度。
 
 ```bash
-# 使用 Rapp 模型训练 (p=3.0, sat=1.0)
+# 使用 Rapp 模型训练 (推荐配置: p=3.0, sat=1.0)
+# 此配置模拟 GaN 功放特性，并自动包含 DAC INL 非线性。
 python train_resume.py --checkpoint_dir ./model/adda_rapp_snr10 \
     --resume_from ./model/baseline_snr10/model_epoch_400.pth \
     --enable_adda \
     --nonlinearity rapp \
     --adda_p 3.0 \
     --adda_sat 1.0 \
-    --adda_bits 8 \
-    --log_dir ./log/adda_rapp
+    --rho 1.0 --snr 10
 ```
 
 **B. 使用 Tanh 模型 (Baseline)**
@@ -148,15 +203,37 @@ python train_resume.py --checkpoint_dir ./model/adda_rapp_snr10 \
 *   `--adda_beta`: 输入增益因子。
 
 ```bash
-# 使用 Tanh 模型训练
+# 使用 Tanh 模型训练 (alpha=1.0, beta=1.0)
 python train_resume.py --checkpoint_dir ./model/adda_tanh_snr10 \
     --resume_from ./model/baseline_snr10/model_epoch_400.pth \
     --enable_adda \
     --nonlinearity tanh \
     --adda_alpha 1.0 \
     --adda_beta 1.0 \
-    --adda_bits 8 \
-    --log_dir ./log/adda_tanh
+    --rho 1.0 --snr 10
+```
+
+#### 步骤三：验证与测试 (Verification)
+使用 `decompress.py` 进行端到端性能测试。由于我们内置了 `decompress.py` 会自动读取训练时的非线性配置（需手动指定参数以匹配训练设置），请确保测试参数与训练一致。
+
+```bash
+# 测试 Rapp 模型 (需与训练参数一致)
+python decompress.py --checkpoint_dir ./model/adda_rapp_snr10 --model_name model_epoch_400.pth \
+    --input_dir ./PointCloud-compression-geo/output/test \
+    --output_dir ./PointCloud-compression-geo/decompressed/test_rapp \
+    --nonlinearity rapp \
+    --adda_p 3.0 \
+    --adda_sat 1.0 \
+    --snr 10
+
+# 测试 Tanh 模型
+python decompress.py --checkpoint_dir ./model/adda_tanh_snr10 --model_name model_epoch_400.pth \
+    --input_dir ./PointCloud-compression-geo/output/test \
+    --output_dir ./PointCloud-compression-geo/decompressed/test_tanh \
+    --nonlinearity tanh \
+    --adda_alpha 1.0 \
+    --adda_beta 1.0 \
+    --snr 10
 ```
 
 ### 5.4. 非线性模型对比 (Nonlinearity Config)
