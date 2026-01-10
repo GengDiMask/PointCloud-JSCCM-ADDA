@@ -92,17 +92,20 @@ def train():
     points_train = points[:-args.num_val]
     points_val = points[-args.num_val:]
 
+    enable_adda = not args.disable_adda
     ae = TAE.AutoEncoder(
         num_filters=args.num_filters, 
         task=args.task, 
         snr=10,
-        enable_adda=args.enable_adda,
+        enable_adda=enable_adda,
         adda_bits=args.adda_bits,
         adda_alpha=args.adda_alpha,
         adda_beta=args.adda_beta,
         nonlinearity=args.nonlinearity,
-        adda_p=args.adda_p,
-        adda_sat=args.adda_sat
+        p=args.adda_p,
+        sat=args.adda_sat,
+        dnl_sigma=args.dnl_sigma,
+        inl_gamma=args.inl_gamma
     ).cuda()
     criterion = TAE.get_loss().cuda()
 
