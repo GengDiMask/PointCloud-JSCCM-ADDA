@@ -70,31 +70,36 @@ def quantize_tensor(x):
     x = x.to(dtype=torch.uint8)  # 转换为 uint8 类型
     return x
 
-def ADDA_channel(x, snr, bits, alpha, beta, nonlinearity='rapp', p=3.0, sat=1.0):
+def ADDA_channel(x, snr, bits, alpha, beta, nonlinearity='none', p=3.0, sat=1.0, dnl_sigma=0.0, inl_gamma=0.01):
     """
-    Apply ADDA channel impairments using Numpy (Quantization -> INL -> Non-linearity -> AWGN).
+    Apply ADDA channel impairments using Numpy (DNL -> Quantization -> INL -> Non-linearity -> AWGN).
     """
-    inl_gamma = 0.01  # Fixed internal parameter
 
-    # 1. Quantization (DAC resolution limit)
+    # 1. DNL (Differential Non-Linearity) - Simulated by Threshold Jitter (Additive Noise)
+    if dnl_sigma > 0:
+        dnl_noise = np.random.normal(0, dnl_sigma, x.shape)
+        x = x + dnl_noise
+
+    # 2. Quantization (DAC resolution limit)
     scale = 2 ** (bits - 1)
     x = np.round(x * scale) / scale
 
-    # 2. INL (Integral Non-Linearity)
+    # 3. INL (Integral Non-Linearity)
     # Cubic distortion
     x = x + inl_gamma * np.power(x, 3)
 
-    # 3. Non-linearity (PA saturation)
+    # 4. Non-linearity (PA saturation) - OPTIONAL
     if nonlinearity == 'rapp':
         # Rapp Model
         num = x
         den = np.power(1 + np.power(np.abs(x) / sat, 2 * p), 1 / (2 * p))
         x = num / den
-    else:
+    elif nonlinearity == 'tanh':
         # Tanh Model: y = alpha * tanh(beta * x)
         x = alpha * np.tanh(beta * x)
+    # If 'none', PA is bypassed (Pure ADC Mode)
     
-    # 4. Physical Channel (AWGN)
+    # 5. Physical Channel (AWGN)
     # Reuse the existing AWGN_channel function
     x = AWGN_channel(x, snr)
     
@@ -160,9 +165,26 @@ if __name__ == '__main__':
         help='Use channels last instead of channels first.')
 
     # ADDA Compensation Arguments
+    # ADDA Compensation Arguments
     parser.add_argument(
-        '--enable_adda', action='store_true',
-        help='Enable ADDA channel compensation training.')
+        '--disable_adda', action='store_true',
+        help='Disable ADDA channel compensation training (ADDA is ENABLED by default).')
+    
+    parser.add_argument(
+        '--nonlinearity',
+        help="Type of nonlinearity: 'rapp' (PA), 'tanh' (Baseline), or 'none' (Pure ADC Mode). Default is 'none'.",
+        type=str, default='none', choices=['rapp', 'tanh', 'none'])
+        
+    parser.add_argument(
+        '--dnl_sigma',
+        help="Std dev of DNL noise (Quantization threshold jitter). Default 0.01.",
+        type=float, default=0.01)
+
+    parser.add_argument(
+        '--inl_gamma',
+        help="Coefficient for DAC Integral Non-Linearity (INL). Default 0.01.",
+        type=float, default=0.01)
+
     parser.add_argument(
         '--adda_bits', type=int, default=8,
         help='Quantization bits for ADDA.')
@@ -173,9 +195,7 @@ if __name__ == '__main__':
         '--adda_beta', type=float, default=1.0,
         help='ADDA non-linearity parameter beta.')
         
-    parser.add_argument(
-        '--nonlinearity', type=str, default='rapp', choices=['tanh', 'rapp'],
-        help='Type of ADDA nonlinearity (tanh or rapp).')
+
     parser.add_argument(
         '--adda_p', type=float, default=3.0,
         help='Smoothness parameter p for Rapp model.')
@@ -221,17 +241,21 @@ if __name__ == '__main__':
     MODEL_FILE = os.path.join(args.checkpoint_dir, args.model_name)
     # ae = torch.load(MODEL_FILE).cuda().eval()
     # ae = torch.load(MODEL_FILE).cuda().eval()
+    
+    enable_adda = not args.disable_adda
     ae = TAE.AutoEncoder(
         num_filters=args.num_filters,
         task=args.task, 
         snr=10, 
-        enable_adda=args.enable_adda,
+        enable_adda=enable_adda,
         adda_bits=args.adda_bits,
         adda_alpha=args.adda_alpha,
         adda_beta=args.adda_beta,
         nonlinearity=args.nonlinearity,
-        adda_p=args.adda_p,
-        adda_sat=args.adda_sat
+        p=args.adda_p,
+        sat=args.adda_sat,
+        dnl_sigma=args.dnl_sigma,
+        inl_gamma=args.inl_gamma
     )  # 根据你的模型参数进行调整
 
     # 加载模型状态字典
@@ -256,7 +280,9 @@ if __name__ == '__main__':
                 args.adda_beta,
                 nonlinearity=args.nonlinearity,
                 p=args.adda_p,
-                sat=args.adda_sat
+                sat=args.adda_sat,
+                dnl_sigma=args.dnl_sigma,
+                inl_gamma=args.inl_gamma
             ).astype(np.float32)
         else:
             # Use original numpy AWGN channel

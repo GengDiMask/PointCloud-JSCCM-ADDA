@@ -11,6 +11,10 @@ model/*
 log/*
 !log/.gitkeep
 
+# 同理忽略 model
+LDPC_master/*
+!LDPC_master/.gitkeep
+
 **/__pycache__/
 
 PointCloud-compression-geo/output/*

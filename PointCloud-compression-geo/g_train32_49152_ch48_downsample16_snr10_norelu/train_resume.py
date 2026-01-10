@@ -314,9 +314,25 @@ if __name__ == '__main__':
         help='Use channels last instead of channels first.')
         
     # ADDA Compensation Arguments
+    # ADDA Compensation Arguments (Non-linearity, INL/DNL)
     parser.add_argument(
-        '--enable_adda', action='store_true',
-        help='Enable ADDA channel compensation training.')
+        '--disable_adda', action='store_true',
+        help='Disable ADDA channel compensation training (ADDA is ENABLED by default).')
+    
+    parser.add_argument(
+        '--nonlinearity',
+        help="Type of nonlinearity: 'rapp' (PA), 'tanh' (Baseline), or 'none' (Pure ADC Mode). Default is 'none'.",
+        type=str, default='none', choices=['rapp', 'tanh', 'none'])
+        
+    parser.add_argument(
+        '--dnl_sigma',
+        help="Std dev of DNL noise (Quantization threshold jitter). Default 0.01.",
+        type=float, default=0.01)
+        
+    parser.add_argument(
+        '--inl_gamma',
+        help="Coefficient for DAC Integral Non-Linearity (INL). Default 0.01.",
+        type=float, default=0.01)
 
     parser.add_argument(
         '--adda_bits', type=int, default=8,
@@ -330,9 +346,7 @@ if __name__ == '__main__':
         '--adda_beta', type=float, default=1.0,
         help='ADDA non-linearity parameter beta.')
         
-    parser.add_argument(
-        '--nonlinearity', type=str, default='rapp', choices=['tanh', 'rapp'],
-        help='Type of ADDA nonlinearity (tanh or rapp).')
+
     parser.add_argument(
         '--adda_p', type=float, default=3.0,
         help='Smoothness parameter p for Rapp model.')

@@ -43,7 +43,7 @@ class QuantizationLayer(torch.autograd.Function):
 
 
 class ADDAChannel(nn.Module):
-    def __init__(self, snr, bits=8, alpha=1.0, beta=1.0, nonlinearity='rapp', p=3.0, sat=1.0):
+    def __init__(self, snr, bits=8, alpha=1.0, beta=1.0, nonlinearity='none', p=3.0, sat=1.0, dnl_sigma=0.0, inl_gamma=0.01):
         super(ADDAChannel, self).__init__()
         self.awgn = AWGNChannel(snr)
         self.bits = bits
@@ -52,7 +52,8 @@ class ADDAChannel(nn.Module):
         self.nonlinearity = nonlinearity
         self.p = p
         self.sat = sat
-        self.inl_gamma = 0.01  # Fixed internal parameter for DAC INL
+        self.dnl_sigma = dnl_sigma
+        self.inl_gamma = inl_gamma  # Configurable parameter for DAC INL
 
     def _tanh_model(self, x):
         # Model: y = alpha * tanh(beta * x)
@@ -65,20 +66,26 @@ class ADDAChannel(nn.Module):
         return num / den
 
     def forward(self, x):
-        # 1. Quantization (DAC resolution limit)
+        # 1. DNL (Differential Non-Linearity) - Simulated by Threshold Jitter (Noise)
+        if self.dnl_sigma > 0:
+            noise = torch.randn_like(x) * self.dnl_sigma
+            x = x + noise
+
+        # 2. Quantization (DAC resolution limit)
         x = QuantizationLayer.apply(x, self.bits)
 
-        # 2. INL (Integral Non-Linearity for DAC)
+        # 3. INL (Integral Non-Linearity for DAC)
         # Cubic distortion: y = x + gamma * x^3
         x = x + self.inl_gamma * torch.pow(x, 3)
 
-        # 3. Non-linearity (PA Saturation)
+        # 4. Non-linearity (PA Saturation) - OPTIONAL
         if self.nonlinearity == 'rapp':
             x = self._rapp_model(x)
-        else:
+        elif self.nonlinearity == 'tanh':
             x = self._tanh_model(x)
+        # If 'none', PA is bypassed (Pure ADC Mode)
         
-        # 4. Physical Channel (AWGN)
+        # 5. Physical Channel (AWGN)
         x = self.awgn(x)
         
         return x
@@ -194,7 +201,7 @@ class DecoderNetwork(nn.Module):
         x = torch.sigmoid(self.conv3(x))
         return x
 class AutoEncoder(nn.Module):
-    def __init__(self, num_filters, task, snr, enable_adda=False, adda_bits=8, adda_alpha=1.0, adda_beta=1.0, nonlinearity='rapp', adda_p=3.0, adda_sat=1.0):
+    def __init__(self, num_filters, task, snr, enable_adda=False, adda_bits=8, adda_alpha=1.0, adda_beta=1.0, nonlinearity='none', p=3.0, sat=1.0, dnl_sigma=0.0, inl_gamma=0.01):
         super(AutoEncoder, self).__init__()
         self.encoder = EncoderNetwork(task, num_filters)
         if enable_adda:
@@ -204,8 +211,10 @@ class AutoEncoder(nn.Module):
                 alpha=adda_alpha, 
                 beta=adda_beta,
                 nonlinearity=nonlinearity,
-                p=adda_p,
-                sat=adda_sat
+                p=p,
+                sat=sat,
+                dnl_sigma=dnl_sigma,
+                inl_gamma=inl_gamma
             )
         else:
             self.awgnchannel = AWGNChannel(snr)

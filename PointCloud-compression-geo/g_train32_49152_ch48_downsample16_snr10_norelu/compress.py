@@ -61,10 +61,25 @@ parser.add_argument(
         '--channels_last', action='store_true',
         help='Use channels last instead of channels first.')
 
-# ADDA Compensation Arguments
+# ADDA Compensation Arguments (Non-linearity, INL/DNL)
 parser.add_argument(
-    '--enable_adda', action='store_true',
-    help='Enable ADDA channel compensation training.')
+    '--disable_adda', action='store_true',
+    help='Disable ADDA channel compensation interpolation (ADDA is ENABLED by default).')
+
+parser.add_argument(
+    '--nonlinearity',
+    help="Type of nonlinearity: 'rapp' (PA), 'tanh' (Baseline), or 'none' (Pure ADC Mode). Default is 'none'.",
+    type=str, default='none', choices=['rapp', 'tanh', 'none'])
+    
+    parser.add_argument(
+        '--dnl_sigma',
+        help="Std dev of DNL noise (Quantization threshold jitter). Default 0.01.",
+        type=float, default=0.01)
+        
+    parser.add_argument(
+        '--inl_gamma',
+        help="Coefficient for DAC Integral Non-Linearity (INL). Default 0.01.",
+        type=float, default=0.01)
 parser.add_argument(
     '--adda_bits', type=int, default=8,
     help='Quantization bits for ADDA.')
@@ -75,9 +90,7 @@ parser.add_argument(
     '--adda_beta', type=float, default=1.0,
     help='ADDA non-linearity parameter beta.')
     
-parser.add_argument(
-    '--nonlinearity', type=str, default='rapp', choices=['tanh', 'rapp'],
-    help='Type of ADDA nonlinearity (tanh or rapp).')
+
 parser.add_argument(
     '--adda_p', type=float, default=3.0,
     help='Smoothness parameter p for Rapp model.')
@@ -123,17 +136,20 @@ vol_points = vol_points.cuda() # [917 ,1 ,32 ,32 ,32]
 MODEL_FILE = os.path.join(args.checkpoint_dir, args.model_name)
 # ae = torch.load(MODEL_FILE).cuda().eval()
 # ae = torch.load(MODEL_FILE).cuda().eval()
+enable_adda = not args.disable_adda
 ae = TAE.AutoEncoder(
     num_filters=args.num_filters,
     task=args.task, 
     snr=10, 
-    enable_adda=args.enable_adda,
+    enable_adda=enable_adda,
     adda_bits=args.adda_bits,
     adda_alpha=args.adda_alpha,
     adda_beta=args.adda_beta,
     nonlinearity=args.nonlinearity,
-    adda_p=args.adda_p,
-    adda_sat=args.adda_sat
+    p=args.adda_p,
+    sat=args.adda_sat,
+    dnl_sigma=args.dnl_sigma,
+    inl_gamma=args.inl_gamma
 )  # 根据你的模型参数进行调整
 
 # 加载模型状态字典
