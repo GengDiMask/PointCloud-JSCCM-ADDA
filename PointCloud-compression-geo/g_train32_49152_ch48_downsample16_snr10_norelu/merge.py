@@ -55,11 +55,11 @@ def run(args):
         ori_files = sorted([f for f in os.listdir(args.ori_dir) if '.ply' in f])
         print(f'There are {len(ori_files)} .ply files.')
 
-        div_dir_db = os.path.normpath(args.div_dir + '{}'.format(snr) + 'dB')
+        div_dir_db = os.path.join(args.div_dir, '{}dB'.format(snr))
         div_files = sorted([f for f in os.listdir(div_dir_db) if '.ply' in f])
         print(f'There are {len(div_files)} divided .ply files.')
 
-        output_dir_db = os.path.normpath(args.output_dir + '{}'.format(snr) + 'dB_merged')
+        output_dir_db = os.path.join(args.output_dir, '{}dB_merged'.format(snr))
         os.makedirs(output_dir_db, exist_ok=True)
         tqdm_handle = tqdm(ori_files)
 
