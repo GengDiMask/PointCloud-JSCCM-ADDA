@@ -270,7 +270,7 @@ if __name__ == '__main__':
         #args.output_dir = os.path.normpath(args.output_dir+'{}'.format(snr)+'dB')
         # a = os.path.normpath(args.output_dir + '{}'.format(snr) + 'dB')
         # output_files = [os.path.join(a, x + 'dB.ply') for x in filenames]
-        if args.enable_adda:
+        if enable_adda:
             # Use Numpy implementations for ADDA channel
             code_input = ADDA_channel(
                 compressed_data, 
@@ -296,7 +296,7 @@ if __name__ == '__main__':
         if args.task == 'geometry':
             with torch.no_grad():
                 for i in tqdm(range(len(filenames))):
-                    output_dir1=os.path.normpath(args.output_dir+'{}'.format(snr)+'dB')
+                    output_dir1 = os.path.join(args.output_dir, '{}dB'.format(snr))
                     os.makedirs(output_dir1, exist_ok=True)
                     output_file=os.path.join(output_dir1, filenames[i] + 'dB.ply')
                     y=code_input[i]
