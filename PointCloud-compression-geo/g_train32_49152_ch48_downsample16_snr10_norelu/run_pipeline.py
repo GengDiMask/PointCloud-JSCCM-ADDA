@@ -23,8 +23,8 @@ import time
 SCRIPT_DIR = "./PointCloud-compression-geo/g_train32_49152_ch48_downsample16_snr10_norelu"
 
 # --- 通用参数 ---
-CHECKPOINT_DIR = "./model/adda_adaptation"
-MODEL_NAME = "model_epoch_500.pth"
+CHECKPOINT_DIR = "./model/adda_pure_adc"
+MODEL_NAME = "model_epoch_400.pth"
 NUM_FILTERS = 48
 TASK = "geometry"  # geometry / color / geometry+color
 RESOLUTION = 32

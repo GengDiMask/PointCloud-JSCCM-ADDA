@@ -71,12 +71,12 @@ parser.add_argument(
     help="Type of nonlinearity: 'rapp' (PA), 'tanh' (Baseline), or 'none' (Pure ADC Mode). Default is 'none'.",
     type=str, default='none', choices=['rapp', 'tanh', 'none'])
     
-    parser.add_argument(
+parser.add_argument(
         '--dnl_sigma',
         help="Std dev of DNL noise (Quantization threshold jitter). Default 0.01.",
         type=float, default=0.01)
         
-    parser.add_argument(
+parser.add_argument(
         '--inl_gamma',
         help="Coefficient for DAC Integral Non-Linearity (INL). Default 0.01.",
         type=float, default=0.01)
