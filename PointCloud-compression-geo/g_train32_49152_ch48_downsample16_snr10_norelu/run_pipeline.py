@@ -23,7 +23,7 @@ import time
 SCRIPT_DIR = "./PointCloud-compression-geo/g_train32_49152_ch48_downsample16_snr10_norelu"
 
 # --- 通用参数 ---
-CHECKPOINT_DIR = "./model/adda_pure_adc"
+CHECKPOINT_DIR = "./model/noadda"
 MODEL_NAME = "model_epoch_400.pth"
 NUM_FILTERS = 48
 TASK = "geometry"  # geometry / color / geometry+color
@@ -44,14 +44,14 @@ INL_GAMMA = 0.01 # Coefficient for DAC Integral Non-Linearity
 # --- 输入/输出路径 ---
 # 1. 压缩阶段：分块好的点云 -> 压缩后的 txt
 INPUT_BLOCKS_DIR = "../code/data/test/longdress1300_block_32"
-COMPRESSED_OUTPUT_DIR = "./PointCloud-compression-geo/output/ADDA/longdress1300_compressed"
+COMPRESSED_OUTPUT_DIR = "./PointCloud-compression-geo/output/ADDA/noadda1/longdress1300_compressed"
 
 # 2. 解压阶段：压缩后的 txt -> 解压后的点云块
-DECOMPRESSED_OUTPUT_DIR = "./PointCloud-compression-geo/decompressed/ADDA/longdress1300_decompressed"
+DECOMPRESSED_OUTPUT_DIR = "./PointCloud-compression-geo/decompressed/ADDA/noadda1/longdress1300_decompressed"
 
 # 3. 合并阶段：解压后的点云块 -> 完整点云
 ORIGINAL_PC_DIR = "../code/data/test/longdress1300"  # 用于获取原始文件名
-MERGED_OUTPUT_DIR = "./PointCloud-compression-geo/merged/ADDA/longdress1300_merged"
+MERGED_OUTPUT_DIR = "./PointCloud-compression-geo/merged/ADDA/noadda1/longdress1300_merged"
 
 # ================================================================================
 # 以下代码无需修改
