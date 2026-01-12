@@ -200,7 +200,8 @@ class DecoderNetworkV2(nn.Module):
             ch = 1
             
         # Input convolution (from latent space)
-        self.conv_in = nn.ConvTranspose3d(num_filters, num_filters, kernel_size=5, stride=4, padding=2, output_padding=1)
+        # 2->8: stride=4, kernel=5, padding=2, output_padding=3
+        self.conv_in = nn.ConvTranspose3d(num_filters, num_filters, kernel_size=5, stride=4, padding=2, output_padding=3)
         self.gn_in = nn.GroupNorm(groups, num_filters)
         
         # Residual block 1
