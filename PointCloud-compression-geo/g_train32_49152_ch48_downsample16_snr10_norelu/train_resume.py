@@ -7,6 +7,7 @@ import torch
 import re
 import torch.utils.data as data
 import TAE
+import TAE_v2
 import pc_io
 import warnings
 import logging
@@ -93,20 +94,40 @@ def train():
     points_val = points[-args.num_val:]
 
     enable_adda = not args.disable_adda
-    ae = TAE.AutoEncoder(
-        num_filters=args.num_filters, 
-        task=args.task, 
-        snr=10,
-        enable_adda=enable_adda,
-        adda_bits=args.adda_bits,
-        adda_alpha=args.adda_alpha,
-        adda_beta=args.adda_beta,
-        nonlinearity=args.nonlinearity,
-        p=args.adda_p,
-        sat=args.adda_sat,
-        dnl_sigma=args.dnl_sigma,
-        inl_gamma=args.inl_gamma
-    ).cuda()
+    
+    # Select model version
+    if args.model_version == 'v2':
+        print("Using TAE_v2 (Improved Architecture with SE Attention + GN + GELU)")
+        ae = TAE_v2.AutoEncoderV2(
+            num_filters=args.num_filters, 
+            task=args.task, 
+            snr=10,
+            enable_adda=enable_adda,
+            adda_bits=args.adda_bits,
+            adda_alpha=args.adda_alpha,
+            adda_beta=args.adda_beta,
+            nonlinearity=args.nonlinearity,
+            p=args.adda_p,
+            sat=args.adda_sat,
+            dnl_sigma=args.dnl_sigma,
+            inl_gamma=args.inl_gamma
+        ).cuda()
+    else:
+        print("Using TAE (Baseline Architecture)")
+        ae = TAE.AutoEncoder(
+            num_filters=args.num_filters, 
+            task=args.task, 
+            snr=10,
+            enable_adda=enable_adda,
+            adda_bits=args.adda_bits,
+            adda_alpha=args.adda_alpha,
+            adda_beta=args.adda_beta,
+            nonlinearity=args.nonlinearity,
+            p=args.adda_p,
+            sat=args.adda_sat,
+            dnl_sigma=args.dnl_sigma,
+            inl_gamma=args.inl_gamma
+        ).cuda()
     criterion = TAE.get_loss().cuda()
 
     optimizer = torch.optim.Adam(ae.parameters(), lr=0.0001)
@@ -336,6 +357,12 @@ if __name__ == '__main__':
         '--inl_gamma',
         help="Coefficient for DAC Integral Non-Linearity (INL). Default 0.01.",
         type=float, default=0.01)
+
+    # Model Version Selection
+    parser.add_argument(
+        '--model_version',
+        help="Model architecture version: 'v1' (baseline TAE) or 'v2' (improved with SE+GN+GELU). Default is 'v1'.",
+        type=str, default='v1', choices=['v1', 'v2'])
 
     parser.add_argument(
         '--adda_bits', type=int, default=8,

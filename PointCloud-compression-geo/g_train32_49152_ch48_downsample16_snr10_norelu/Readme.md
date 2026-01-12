@@ -131,3 +131,34 @@ python decompress.py \
 | **`--inl_gamma`** | 0.01 | **积分非线性 (INL)**。模拟传输曲线的整体弯曲(三次谐波)。 | `0.01`: 典型商用 DAC (1% 失真)；`0.001`: 高端仪器 |
 | **`--adda_p`** | 3.0 | (Rapp模型) **膝部系数**。控制功放进入饱和的急剧程度。 | `2.0`: GaAs; `3.0`: GaN/LDMOS; `inf`: 理想硬限幅 |
 | **`--adda_sat`** | 1.0 | (Rapp模型) **饱和电压**。功放最大输出幅值。 | `1.0`: 归一化标准值；设为很大(如100)可近似线性功放 |
+
+---
+
+## 6. 网络架构版本 (Model Versions)
+
+本项目提供两种网络架构版本，可通过 `--model_version` 参数切换。
+
+### TAE (v1) - 基线架构
+*   **文件**: `TAE.py`
+*   **结构**: 双分支残差块 + ReLU
+*   **特点**: 参数量小，训练快
+
+### TAE_v2 (v2) - 改进架构 (NEW)
+*   **文件**: `TAE_v2.py`
+*   **改进点**:
+    | 改进 | 说明 |
+    |---|---|
+    | **SE 注意力块** | Squeeze-and-Excitation，自适应通道加权 |
+    | **Group Norm** | 批大小无关的归一化，训练更稳定 |
+    | **GELU 激活** | 平滑梯度，保留负值信息 |
+    | **Pre-Act ResBlock** | GN→GELU→Conv，更好的梯度流 |
+*   **预期提升**: PSNR +0.5~1.5 dB
+
+### 使用方式
+```bash
+# 使用基线架构 (默认)
+python train_resume.py --model_version v1 ...
+
+# 使用改进架构
+python train_resume.py --model_version v2 ...
+```
