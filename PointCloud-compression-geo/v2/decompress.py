@@ -1,0 +1,326 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""
+Decompression script
+Code adpated from https://github.com/mauriceqch/pcc_geo_cnn
+"""
+
+import torch
+import argparse
+import gzip
+import logging
+import multiprocessing
+import os
+os.environ['CUDA_VISIBLE_DEVICES']='1'
+
+import warnings
+warnings.filterwarnings('ignore', category=FutureWarning)
+
+import numpy as np
+import TAE
+from tqdm import tqdm
+
+import pc_io
+import time
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s',
+    datefmt="%Y-%m-%d %H:%M:%S")
+logger = logging.getLogger(__name__)
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+np.random.seed(42)
+
+# 需不需要用那个类的还要另说
+def AWGN_channel(x, snr):  # AWGN channel consider Peak power limitated system this SNR equal peak signal noise ratio
+    [ batch_size,num_file,len_1, len_2,len_3] = x.shape
+    x_power = np.sum(x ** 2) / (batch_size * num_file * len_1* len_2*len_3)
+    n_power = x_power / (10 ** (snr / 10.0))
+    n_power = np.sqrt(n_power)
+    noise = np.random.randn(batch_size, num_file, len_1, len_2, len_3) *n_power ## change to guassian 
+    return x + noise
+
+def load_compressed_file(c_file):
+    string = np.loadtxt(c_file)
+    string = np.reshape(string,(args.num_filters,channel_num,channel_num,channel_num))
+    return string
+
+
+def load_compressed_files(files):
+    files_len = len(files)
+    # with multiprocessing.Pool() as p:
+    #     logger.info('Loading data into memory (parallel reading)')
+    #     list_file = p.imap(load_compressed_file, files)
+    #     data = np.array(
+    #         list(tqdm(list_file, total=files_len)))
+    # logger.info('Loading data into memory (parallel reading)')
+    files_list = files.tolist()
+    data = []
+    logger.info('Loading data into memory (parallel reading)')
+    for file_name in files_list:
+        data.append(load_compressed_file(file_name))
+    data = np.reshape(data,(files_len,args.num_filters,channel_num,channel_num,channel_num))
+    # data = np.stack(data,axis=0)
+    # data = tf.convert_to_tensor(data)
+    return data
+
+def quantize_tensor(x):
+    x = torch.round(x)  # 四舍五入
+    x = x.to(dtype=torch.uint8)  # 转换为 uint8 类型
+    return x
+
+def ADDA_channel(x, snr, bits, alpha, beta, nonlinearity='none', p=3.0, sat=1.0):
+    """
+    Apply ADDA channel impairments using Numpy (Quantization -> Non-linearity -> AWGN).
+    Note: INL is now handled by the learned DeepINL module in the neural network.
+    """
+
+    # 1. Quantization (DAC resolution limit)
+    scale = 2 ** (bits - 1)
+    x = np.round(x * scale) / scale
+
+    # 2. Non-linearity (PA saturation) - OPTIONAL
+    if nonlinearity == 'rapp':
+        # Rapp Model
+        num = x
+        den = np.power(1 + np.power(np.abs(x) / sat, 2 * p), 1 / (2 * p))
+        x = num / den
+    elif nonlinearity == 'tanh':
+        # Tanh Model: y = alpha * tanh(beta * x)
+        x = alpha * np.tanh(beta * x)
+    # If 'none', PA is bypassed (Pure ADC Mode)
+    
+    # 3. Physical Channel (AWGN)
+    x = AWGN_channel(x, snr)
+    
+    return x
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        prog='decompress.py',
+        description='Decompress a file.',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+
+    parser.add_argument(
+        '--geo_dir',
+        help='Geometry input directory.',type=str,default='data/test/blocks_32_rgb_longdress')
+    parser.add_argument(
+        '--geo_pattern',
+        help='Geometry mesh detection pattern.',type=str,default='*.ply')
+    parser.add_argument(
+        '--input_dir',
+        help='Input directory.',type=str,default='./PointCloud-compression-geo/output/test')
+    parser.add_argument(
+        '--input_pattern',
+        help='Mesh detection pattern.',type=str,default='*.ply.txt')
+    parser.add_argument(
+        '--output_dir',
+        help='Output directory.',type=str,default='./PointCloud-compression-geo/decompressed/test/')
+    parser.add_argument(
+        '--checkpoint_dir',
+        help='Directory where to save/load model checkpoints.',type=str,default='./model/baseline_snr10_nocur')
+    parser.add_argument(
+        '--model_name', type=str, default='model_epoch_400.pth',
+        help='The filename of the model checkpoint.')
+    parser.add_argument(
+        '--batch_size', type=int, default=1,
+        help='Batch size.')
+    # 没用到
+    parser.add_argument(
+        '--read_batch_size', type=int, default=1,
+        help='Batch size for parallel reading.')
+    parser.add_argument(
+        '--resolution',
+        type=int, help='Dataset resolution.', default=32)
+    parser.add_argument(
+        '--task', type=str, default='geometry',
+        help='Compression tasks (geometry/color/geometry+color).')
+    parser.add_argument(
+        '--num_filters', type=int, default=48,
+        help='Number of filters per layer.')
+
+    parser.add_argument(
+        '--output_extension', default='.ply',
+        help='Output extension.')
+    parser.add_argument(
+        '--color_space', type=str, default='rgb',
+        help='Color space type.')
+    parser.add_argument(
+        '--network_type', type=str, default='base',
+        help='Neural network type.')
+    parser.add_argument(
+        '--channels_last', action='store_true',
+        help='Use channels last instead of channels first.')
+
+    # ADDA Compensation Arguments
+    # ADDA Compensation Arguments
+    parser.add_argument(
+        '--disable_adda', action='store_true',
+        help='Disable ADDA channel compensation training (ADDA is ENABLED by default).')
+    
+    parser.add_argument(
+        '--nonlinearity',
+        help="Type of nonlinearity: 'rapp' (PA), 'tanh' (Baseline), or 'none' (Pure ADC Mode). Default is 'none'.",
+        type=str, default='none', choices=['rapp', 'tanh', 'none'])
+        
+    parser.add_argument(
+        '--inl_hidden_dim',
+        help="Hidden dimension for learnable INL network (DeepINL). Default 64.",
+        type=int, default=64)
+
+    parser.add_argument(
+        '--adda_bits', type=int, default=8,
+        help='Quantization bits for ADDA.')
+    parser.add_argument(
+        '--adda_alpha', type=float, default=1.0,
+        help='ADDA non-linearity parameter alpha.')
+    parser.add_argument(
+        '--adda_beta', type=float, default=1.0,
+        help='ADDA non-linearity parameter beta.')
+        
+
+    parser.add_argument(
+        '--adda_p', type=float, default=3.0,
+        help='Smoothness parameter p for Rapp model.')
+    parser.add_argument(
+        '--adda_sat', type=float, default=1.0,
+        help='Saturation voltage V_sat for Rapp model.')
+
+    args = parser.parse_args()
+
+    # if not os.path.exists(args.output_dir):
+    #     os.makedirs(args.output_dir)
+
+    assert args.batch_size > 0, 'batch_size must be positive'
+
+    DATA_FORMAT = 'channels_first' if not args.channels_last else 'channels_last'
+
+    args.input_dir = os.path.normpath(args.input_dir)
+    len_input_dir = len(args.input_dir)
+    assert os.path.exists(args.input_dir), "Input directory not found"
+
+    input_glob = os.path.join(args.input_dir, args.input_pattern)
+    files = pc_io.get_files(input_glob)
+    assert len(files) > 0, "No input files found"
+
+    if args.task == 'color':
+        args.geo_dir = os.path.normpath(args.geo_dir)
+        len_geo_dir = len(args.geo_dir)
+        assert os.path.exists(args.geo_dir), "Geometry input directory not found"
+        geo_glob = os.path.join(args.geo_dir, args.geo_pattern)
+        geo_files = pc_io.get_files(geo_glob)
+        assert len(geo_files) > 0, "No geometry input files found"
+        p_min, p_max, _ = pc_io.get_shape_data(args.task, args.resolution, args.channels_last)
+        points = pc_io.load_points(geo_files, p_min, p_max, args.task)
+
+    filenames = [x[len_input_dir + 1:] for x in files]
+    
+    channel_num=2 
+    compressed_data = load_compressed_files(files)
+ 
+    x_shape = np.array([channel_num,channel_num,channel_num],np.uint16)
+    y_shape = np.array([channel_num,channel_num,channel_num],np.uint16)
+
+    MODEL_FILE = os.path.join(args.checkpoint_dir, args.model_name)
+    # ae = torch.load(MODEL_FILE).cuda().eval()
+    # ae = torch.load(MODEL_FILE).cuda().eval()
+    
+    enable_adda = not args.disable_adda
+    ae = TAE.AutoEncoder(
+        num_filters=args.num_filters,
+        task=args.task, 
+        snr=10, 
+        enable_adda=enable_adda,
+        adda_bits=args.adda_bits,
+        adda_alpha=args.adda_alpha,
+        adda_beta=args.adda_beta,
+        nonlinearity=args.nonlinearity,
+        p=args.adda_p,
+        sat=args.adda_sat,
+        inl_hidden_dim=args.inl_hidden_dim
+    )  # 根据你的模型参数进行调整
+
+    # 加载模型状态字典
+    state_dict = torch.load(MODEL_FILE)
+    ae.load_state_dict(state_dict)
+
+    # 移动模型到 GPU 并设置为评估模式
+    ae = ae.cuda()
+    ae.eval()
+
+    for snr in range(0,21,1):
+        #args.output_dir = os.path.normpath(args.output_dir+'{}'.format(snr)+'dB')
+        # a = os.path.normpath(args.output_dir + '{}'.format(snr) + 'dB')
+        # output_files = [os.path.join(a, x + 'dB.ply') for x in filenames]
+        if enable_adda:
+            # Use Numpy implementations for ADDA channel
+            code_input = ADDA_channel(
+                compressed_data, 
+                snr, 
+                args.adda_bits, 
+                args.adda_alpha, 
+                args.adda_beta,
+                nonlinearity=args.nonlinearity,
+                p=args.adda_p,
+                sat=args.adda_sat
+            ).astype(np.float32)
+        else:
+            # Use original numpy AWGN channel
+            code_input = AWGN_channel(compressed_data, snr).astype(np.float32)
+
+        # codeWithNoise = compressed_data.astype(np.float32)
+
+
+        len_files = len(files)
+        i = 0
+        if args.task == 'geometry':
+            with torch.no_grad():
+                for i in tqdm(range(len(filenames))):
+                    output_dir1 = os.path.join(args.output_dir, '{}dB'.format(snr))
+                    os.makedirs(output_dir1, exist_ok=True)
+                    output_file=os.path.join(output_dir1, filenames[i] + 'dB.ply')
+                    y=code_input[i]
+                    y_tensor = torch.from_numpy(y).float()# 32
+                    y_tensor = y_tensor.cuda()
+                    
+                    # Add batch dimension: (C,D,H,W) -> (1,C,D,H,W)
+                    # Necessary because the model expects a batch dimension (N, ...)
+                    y_tensor = y_tensor.unsqueeze(0) 
+                    
+                    y1 = ae.decoder(y_tensor)
+                    
+                    # Remove batch dimension for post-processing
+                    y1 = y1.squeeze(0)
+
+                    y1_quant=quantize_tensor(y1)
+                    y1_quant_np = y1_quant.cpu().numpy()
+                    # y1_np_quant=quantize_tensor(y1_np)
+                    pa = np.argwhere(y1_quant_np[0]).astype('float32')# 找出非零元素的索引
+                    pc_io.write_df(output_file, pc_io.pa_to_df(pa, args.task))
+                    # b=0
+        #     for ret, ori_file, output_file in zip(result, files, output_files):
+        #         logger.info(f'{i + 1}/{len_files} - Writing {ori_file} to {output_file}')
+        #         output_dir, _ = os.path.split(output_file)
+        #         os.makedirs(output_dir, exist_ok=True)
+        #         # Remove the geometry channel
+        #         pa = np.argwhere(ret['x_hat_quant'][0]).astype('float32')# 找出非零元素的索引
+        #         pc_io.write_df(output_file, pc_io.pa_to_df(pa, args.task))
+        #         i += 1
+        #         # get_flops_params()#计算FLOPs
+        # elif args.task == 'color':
+
+        # elif args.task == 'geometry+color':
+
+
+        
+        
+        # # DO THE COMPRESS
+        # with torch.no_grad():
+        #     for i in tqdm(range(len(filenames))):
+        #         y=ae.encoder(vol_points[i])
+        #         representation = torch.flatten(y)
+        #         representation = representation.cpu().numpy()
+        #         np.savetxt(output_files[i],representation,fmt = '%f', delimiter = ',')
